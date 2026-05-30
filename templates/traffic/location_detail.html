@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}{{ location.name }}{% endblock %}
+{% block page_title %}📍 {{ location.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ location.name }}</h1>
+  <p>{{ location.road_name }} · {{ location.city }} · Speed limit: {{ location.speed_limit }} km/h</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" style="margin-bottom:20px">
+  {% with r=location.latest_reading %}
+  {% if r %}
+  <div class="stat-card" style="--accent-color:{{ r.level_color }}">
+    <div class="stat-icon" style="font-size:24px">🚦</div>
+    <div class="stat-value">{{ r.congestion_index|floatformat:1 }}</div>
+    <div class="stat-label">Congestion Index</div>
+  </div>
+  <div class="stat-card" style="--accent-color:#4f8ef7">
+    <div class="stat-icon">💨</div>
+    <div class="stat-value">{{ r.avg_speed|floatformat:0 }}</div>
+    <div class="stat-label">Avg Speed (km/h)</div>
+  </div>
+  <div class="stat-card" style="--accent-color:#22c55e">
+    <div class="stat-icon">🚗</div>
+    <div class="stat-value">{{ r.vehicle_count }}</div>
+    <div class="stat-label">Vehicles</div>
+  </div>
+  <div class="stat-card" style="--accent-color:#f59e0b">
+    <div class="stat-icon">📏</div>
+    <div class="stat-value">{{ r.queue_length|floatformat:0 }}m</div>
+    <div class="stat-label">Queue Length</div>
+  </div>
+  {% endif %}
+  {% endwith %}
+</div>
+
+<div class="grid-2">
+  <!-- Analysis -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">📊 24h Analysis</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="padding:12px;background:var(--bg-card);border-radius:8px">
+          <div style="font-size:11px;color:var(--text-muted)">AVG CONGESTION</div>
+          <div style="font-size:20px;font-weight:800;color:#f59e0b">{{ analysis.avg_congestion }}</div>
+        </div>
+        <div style="padding:12px;background:var(--bg-card);border-radius:8px">
+          <div style="font-size:11px;color:var(--text-muted)">MAX CONGESTION</div>
+          <div style="font-size:20px;font-weight:800;color:#ef4444">{{ analysis.max_congestion }}</div>
+        </div>
+        <div style="padding:12px;background:var(--bg-card);border-radius:8px">
+          <div style="font-size:11px;color:var(--text-muted)">AVG SPEED</div>
+          <div style="font-size:20px;font-weight:800;color:#4f8ef7">{{ analysis.avg_speed }} km/h</div>
+        </div>
+        <div style="padding:12px;background:var(--bg-card);border-radius:8px">
+          <div style="font-size:11px;color:var(--text-muted)">TOTAL READINGS</div>
+          <div style="font-size:20px;font-weight:800">{{ analysis.readings_count }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prediction -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📈 Forecast</span>
+      {% if prediction %}<span class="badge badge-info">{{ prediction.confidence|floatformat:0 }}% confidence</span>{% endif %}
+    </div>
+    <div class="card-body">
+      {% if prediction %}
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="text-align:center;padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">+15 min</div>
+          <div style="font-size:24px;font-weight:800">{{ prediction.pred_15min|floatformat:0|default:"—" }}</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">+30 min</div>
+          <div style="font-size:24px;font-weight:800">{{ prediction.pred_30min|floatformat:0|default:"—" }}</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">+60 min</div>
+          <div style="font-size:24px;font-weight:800">{{ prediction.pred_60min|floatformat:0|default:"—" }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:30px;color:var(--text-muted)">Prediction not yet available</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Alternative Routes -->
+{% if routes %}
+<div class="card" style="margin-top:20px">
+  <div class="card-header"><span class="card-title">🛣️ Alternative Routes</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+      {% for route in routes %}
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">{{ route.description }}</div>
+        <div style="font-size:12px;color:var(--text-secondary)">
+          📍 {{ route.via_roads }}<br>
+          📏 {{ route.distance_km }} km · ⏱️ {{ route.est_time_min }} min
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Recent Readings -->
+<div class="card" style="margin-top:20px">
+  <div class="card-header"><span class="card-title">📋 Recent Readings</span></div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Congestion</th><th>Level</th><th>Speed</th><th>Vehicles</th><th>Source</th></tr></thead>
+        <tbody>
+          {% for r in readings|slice:":20" %}
+          <tr>
+            <td style="font-size:12px;font-family:'JetBrains Mono',monospace">{{ r.timestamp|date:"d M H:i:s" }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="width:60px;height:5px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden">
+                  <div style="height:100%;width:{{ r.congestion_index }}%;background:{{ r.level_color }};border-radius:999px"></div>
+                </div>
+                <span style="font-size:12px">{{ r.congestion_index|floatformat:1 }}</span>
+              </div>
+            </td>
+            <td><span class="badge badge-{{ r.congestion_level }}">{{ r.get_congestion_level_display }}</span></td>
+            <td style="font-size:12px">{{ r.avg_speed|floatformat:1 }} km/h</td>
+            <td style="font-size:12px">{{ r.vehicle_count }}</td>
+            <td><span class="badge badge-secondary">{{ r.source }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

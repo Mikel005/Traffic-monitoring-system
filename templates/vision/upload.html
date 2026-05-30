@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Feed{% endblock %}
+{% block page_title %}Upload Video Feed{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Drop zone ─────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed rgba(79,142,247,.35);
+  border-radius: 16px;
+  background: rgba(79,142,247,.03);
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+  overflow: hidden;
+}
+.drop-zone::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(79,142,247,.08), transparent 70%);
+  pointer-events: none;
+}
+.drop-zone.dragover,
+.drop-zone:hover {
+  border-color: var(--accent);
+  background: rgba(79,142,247,.07);
+  box-shadow: 0 0 30px rgba(79,142,247,.15);
+}
+.drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.drop-icon {
+  width: 72px; height: 72px; border-radius: 20px; margin: 0 auto 1.25rem;
+  background: rgba(79,142,247,.1);
+  border: 1px solid rgba(79,142,247,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem;
+  box-shadow: 0 8px 24px rgba(79,142,247,.15);
+}
+.drop-title {
+  font-size: 1rem; font-weight: 700; color: #f0f4ff; margin-bottom: .4rem;
+}
+.drop-sub {
+  font-size: .78rem; color: var(--text-secondary);
+}
+.drop-formats {
+  display: inline-flex; gap: .5rem; margin-top: 1rem;
+}
+.fmt-tag {
+  font-size: .65rem; font-weight: 700; letter-spacing: 1px;
+  padding: .25rem .6rem; border-radius: 4px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+  color: var(--text-secondary);
+}
+
+/* ── File preview strip ────────────────────────── */
+.file-preview {
+  display: none;
+  align-items: center; gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(34,197,94,.06);
+  border: 1px solid rgba(34,197,94,.2);
+  border-radius: 12px;
+  margin-top: .75rem;
+}
+.file-preview.show { display: flex; }
+.file-preview-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(34,197,94,.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+
+/* ── Pipeline steps ────────────────────────────── */
+.pipeline {
+  display: flex; align-items: stretch; gap: 0;
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pipeline-step {
+  flex: 1; padding: .9rem .5rem; text-align: center;
+  position: relative;
+  border-right: 1px solid rgba(255,255,255,.05);
+}
+.pipeline-step:last-child { border-right: none; }
+.pipeline-step::after {
+  content: '›';
+  position: absolute; right: -7px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted); font-size: .85rem; z-index: 1;
+}
+.pipeline-step:last-child::after { display: none; }
+.ps-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(79,142,247,.1);
+  border: 1px solid rgba(79,142,247,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 800; color: var(--accent);
+  margin: 0 auto .45rem; font-family: 'JetBrains Mono', monospace;
+}
+.ps-label {
+  font-size: .65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-secondary);
+}
+
+/* ── Form card ─────────────────────────────────── */
+.upload-card {
+  background: rgba(12,17,32,.85);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.upload-card-header {
+  padding: 1.2rem 1.6rem;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(255,255,255,.02);
+  display: flex; align-items: center; gap: .75rem;
+}
+.upload-card-body { padding: 1.6rem; }
+
+/* ── Form fields ───────────────────────────────── */
+.cv-label {
+  font-size: .7rem; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-secondary);
+  display: block; margin-bottom: .5rem;
+}
+.cv-select {
+  width: 100%; padding: .7rem 1rem;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  color: var(--text-primary); font-size: .85rem;
+  font-family: 'Inter', sans-serif;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%238b9bc4' d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .75rem center; background-size: 12px;
+}
+.cv-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,142,247,.18);
+}
+.cv-select option { background: #0f1628; }
+
+/* ── Override Bootstrap form-select on this page ── */
+.form-select.bg-dark,
+select.form-select {
+  width: 100%; padding: .7rem 1rem;
+  background-color: rgba(255,255,255,.04) !important;
+  border: 1px solid rgba(255,255,255,.1) !important;
+  border-radius: 10px !important;
+  color: var(--text-primary) !important;
+  font-size: .85rem;
+  font-family: 'Inter', sans-serif;
+  transition: border-color .2s, box-shadow .2s;
+}
+.form-select.bg-dark:focus,
+select.form-select:focus {
+  outline: none !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(79,142,247,.18) !important;
+}
+.form-select.bg-dark option,
+select.form-select option { background: #0f1628; }
+
+/* ── Submit button ─────────────────────────────── */
+.btn-upload {
+  width: 100%; padding: .9rem 1rem;
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  border: none; border-radius: 12px;
+  color: white; font-size: .9rem; font-weight: 700;
+  letter-spacing: .3px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: .6rem;
+  transition: opacity .2s, transform .15s, box-shadow .2s;
+  box-shadow: 0 4px 20px rgba(79,142,247,.3);
+}
+.btn-upload:hover {
+  opacity: .92; transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(79,142,247,.4);
+}
+.btn-upload:active { transform: translateY(0); }
+
+/* ── Info tile ─────────────────────────────────── */
+.info-tile {
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex; align-items: flex-start; gap: .75rem;
+}
+.info-tile-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .9rem; flex-shrink: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4 justify-content-center">
+
+  <!-- ── Upload form ──────────────────────────────── -->
+  <div class="col-12 col-lg-7 col-xl-6">
+    <div class="upload-card">
+
+      <div class="upload-card-header">
+        <div style="width:38px;height:38px;border-radius:10px;background:rgba(79,142,247,.1);
+                    border:1px solid rgba(79,142,247,.25);display:flex;align-items:center;
+                    justify-content:center;font-size:1rem;">
+          <i class="bi bi-cpu text-primary"></i>
+        </div>
+        <div>
+          <div class="text-white fw-bold" style="font-size:.95rem;">Upload Traffic Video</div>
+          <div class="text-muted" style="font-size:.72rem;">YOLOv8n · Vehicle Detection &amp; Congestion Prediction</div>
+        </div>
+      </div>
+
+      <div class="upload-card-body">
+        <form method="POST" enctype="multipart/form-data" action="{% url 'vision:upload_video' %}" id="uploadForm">
+          {% csrf_token %}
+
+          <!-- Drop zone -->
+          <div class="drop-zone mb-3" id="dropZone">
+            <input type="file" name="video_file" id="videoFile" accept="video/*" required>
+            <div class="drop-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+            <div class="drop-title">Drag &amp; drop your video here</div>
+            <div class="drop-sub">or click to browse from your device</div>
+            <div class="drop-formats">
+              <span class="fmt-tag">MP4</span>
+              <span class="fmt-tag">AVI</span>
+              <span class="fmt-tag">MOV</span>
+              <span class="fmt-tag">MKV</span>
+            </div>
+          </div>
+
+          <!-- File selected preview -->
+          <div class="file-preview" id="filePreview">
+            <div class="file-preview-icon text-success"><i class="bi bi-film"></i></div>
+            <div class="flex-grow-1 overflow-hidden">
+              <div class="text-white fw-semibold" style="font-size:.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="fileName">—</div>
+              <div class="text-muted" style="font-size:.72rem;" id="fileSize">—</div>
+            </div>
+            <button type="button" class="btn-icon" id="clearFile" title="Remove">
+              <i class="bi bi-x-lg" style="font-size:.75rem;"></i>
+            </button>
+          </div>
+
+          <!-- Location -->
+          <div class="mb-4 mt-4">
+            <label class="cv-label" for="{{ form.location.id_for_label }}">
+              Associate with Location <span class="text-muted fw-normal">(optional)</span>
+            </label>
+            {{ form.location }}
+            <div class="text-muted mt-2" style="font-size:.72rem;">
+              <i class="bi bi-info-circle me-1"></i>
+              Linking a location will update that location's live dashboard with analysis results.
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="btn-upload" id="submitBtn">
+            <i class="bi bi-play-circle-fill"></i>
+            Process &amp; Analyse Video
+          </button>
+          <a href="{% url 'vision:status' %}"
+             class="d-block text-center text-muted mt-3"
+             style="font-size:.8rem;">
+            ← Back to Vision Status
+          </a>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right info panel ─────────────────────────── -->
+  <div class="col-12 col-lg-5 col-xl-4 d-flex flex-column gap-4">
+
+    <!-- Pipeline -->
+    <div>
+      <div class="text-muted mb-3" style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:1.8px;">
+        Processing Pipeline
+      </div>
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="ps-num">1</div>
+          <div class="ps-label">Upload</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="ps-num">2</div>
+          <div class="ps-label">Decode</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="ps-num">3</div>
+          <div class="ps-label">Detect</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="ps-num">4</div>
+          <div class="ps-label">Track</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="ps-num">5</div>
+          <div class="ps-label">Report</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What we detect -->
+    <div class="d-flex flex-column gap-2">
+      <div class="text-muted mb-1" style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:1.8px;">
+        Detected Classes
+      </div>
+      {% for item in detected_classes %}
+      <div class="info-tile">
+        <div class="info-tile-icon" style="background:rgba(79,142,247,.08);">{{ item.icon }}</div>
+        <div>
+          <div class="text-white fw-semibold" style="font-size:.82rem;">{{ item.label }}</div>
+          <div class="text-muted" style="font-size:.7rem;">COCO class · real-time tracking</div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="info-tile"><div class="info-tile-icon">🚗</div><div><div class="text-white fw-semibold" style="font-size:.82rem;">Car</div><div class="text-muted" style="font-size:.7rem;">COCO class · real-time tracking</div></div></div>
+      <div class="info-tile"><div class="info-tile-icon">🚛</div><div><div class="text-white fw-semibold" style="font-size:.82rem;">Truck</div><div class="text-muted" style="font-size:.7rem;">COCO class · real-time tracking</div></div></div>
+      <div class="info-tile"><div class="info-tile-icon">🏍️</div><div><div class="text-white fw-semibold" style="font-size:.82rem;">Motorcycle</div><div class="text-muted" style="font-size:.7rem;">COCO class · real-time tracking</div></div></div>
+      <div class="info-tile"><div class="info-tile-icon">🚌</div><div><div class="text-white fw-semibold" style="font-size:.82rem;">Bus</div><div class="text-muted" style="font-size:.7rem;">COCO class · real-time tracking</div></div></div>
+      {% endfor %}
+    </div>
+
+    <!-- Tips -->
+    <div class="info-tile" style="background:rgba(245,158,11,.04); border-color:rgba(245,158,11,.15);">
+      <div class="info-tile-icon text-warning" style="background:rgba(245,158,11,.1);">
+        <i class="bi bi-lightbulb"></i>
+      </div>
+      <div>
+        <div class="text-white fw-semibold mb-1" style="font-size:.82rem;">Best results</div>
+        <ul class="text-muted mb-0 ps-3" style="font-size:.72rem; line-height:1.7;">
+          <li>Use top-down or angled intersection footage</li>
+          <li>Minimum 5 seconds, HD resolution preferred</li>
+          <li>Avoid night footage without good lighting</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const dropZone  = document.getElementById('dropZone');
+  const fileInput = document.getElementById('videoFile');
+  const preview   = document.getElementById('filePreview');
+  const nameEl    = document.getElementById('fileName');
+  const sizeEl    = document.getElementById('fileSize');
+  const clearBtn  = document.getElementById('clearFile');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function formatBytes(b) {
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function showFile(file) {
+    nameEl.textContent = file.name;
+    sizeEl.textContent = formatBytes(file.size);
+    preview.classList.add('show');
+    dropZone.style.borderColor = 'var(--success)';
+    dropZone.style.background  = 'rgba(34,197,94,.04)';
+  }
+
+  function clearFile() {
+    fileInput.value = '';
+    preview.classList.remove('show');
+    dropZone.style.borderColor = '';
+    dropZone.style.background  = '';
+  }
+
+  fileInput.addEventListener('change', function () {
+    if (this.files[0]) showFile(this.files[0]);
+  });
+
+  clearBtn.addEventListener('click', clearFile);
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('video/')) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      showFile(file);
+    }
+  });
+
+  document.getElementById('uploadForm').addEventListener('submit', function () {
+    submitBtn.innerHTML = `
+      <span class="spinner-border spinner-border-sm" role="status"></span>
+      Uploading &amp; Processing…`;
+    submitBtn.disabled = true;
+  });
+})();
+</script>
+{% endblock %}

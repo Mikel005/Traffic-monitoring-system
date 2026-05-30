@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Congestion Predictions{% endblock %}
+{% block page_title %}📈 Congestion Predictions{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Multi-Horizon Congestion Forecast</h1>
+  <p>AI-powered predictions for 15, 30, and 60 minute horizons using traffic pattern analysis</p>
+</div>
+
+<div class="grid-auto">
+  {% for item in pred_data %}
+  {% with loc=item.location pred=item.prediction %}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{{ loc.name }}</span>
+      <span class="badge badge-info">{{ pred.confidence|floatformat:0 }}% confidence</span>
+    </div>
+    <div class="card-body">
+
+      <!-- Current index -->
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px">
+          <span>Current Congestion</span>
+          <span>{{ pred.current|floatformat:1 }}/100</span>
+        </div>
+        <div class="congestion-bar">
+          {% if pred.current <= 25 %}
+          <div class="congestion-fill" style="width:{{ pred.current }}%;background:#22c55e"></div>
+          {% elif pred.current <= 50 %}
+          <div class="congestion-fill" style="width:{{ pred.current }}%;background:#f59e0b"></div>
+          {% elif pred.current <= 75 %}
+          <div class="congestion-fill" style="width:{{ pred.current }}%;background:#f97316"></div>
+          {% else %}
+          <div class="congestion-fill" style="width:{{ pred.current }}%;background:#ef4444"></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Horizon forecasts -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="text-align:center;padding:12px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">+15 min</div>
+          <div style="font-size:22px;font-weight:800;color:{% if pred.minutes_15 <= 25 %}#22c55e{% elif pred.minutes_15 <= 50 %}#f59e0b{% elif pred.minutes_15 <= 75 %}#f97316{% else %}#ef4444{% endif %}">
+            {{ pred.minutes_15|floatformat:0 }}
+          </div>
+          <div style="font-size:10px;color:var(--text-muted)">/100</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">+30 min</div>
+          <div style="font-size:22px;font-weight:800;color:{% if pred.minutes_30 <= 25 %}#22c55e{% elif pred.minutes_30 <= 50 %}#f59e0b{% elif pred.minutes_30 <= 75 %}#f97316{% else %}#ef4444{% endif %}">
+            {{ pred.minutes_30|floatformat:0 }}
+          </div>
+          <div style="font-size:10px;color:var(--text-muted)">/100</div>
+        </div>
+        <div style="text-align:center;padding:12px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">+60 min</div>
+          <div style="font-size:22px;font-weight:800;color:{% if pred.minutes_60 <= 25 %}#22c55e{% elif pred.minutes_60 <= 50 %}#f59e0b{% elif pred.minutes_60 <= 75 %}#f97316{% else %}#ef4444{% endif %}">
+            {{ pred.minutes_60|floatformat:0 }}
+          </div>
+          <div style="font-size:10px;color:var(--text-muted)">/100</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:right">
+        Model: {{ pred.model }}
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% endblock %}

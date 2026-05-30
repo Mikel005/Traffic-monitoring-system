@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Devices{% endblock %}
+{% block page_title %}📷 Device Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Device Management</h1>
+  <p>Manage Cameras · IoT Sensors · Device Controllers</p>
+</div>
+
+<div class="grid-2" style="margin-bottom:24px">
+  <!-- Add Camera -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">📷 Add Camera</span></div>
+    <div class="card-body">
+      <form method="post" action="{% url 'devices:add_camera' %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="cam-name">Camera Name</label>
+          <input id="cam-name" class="form-control" type="text" name="name" placeholder="e.g. Camera-05 Lekki" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cam-location">Location</label>
+          <select id="cam-location" name="location" class="form-control" required>
+            {% for loc in locations %}<option value="{{ loc.pk }}">{{ loc.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cam-res">Resolution</label>
+          <select id="cam-res" name="resolution" class="form-control">
+            <option value="480p">480p SD</option>
+            <option value="720p">720p HD</option>
+            <option value="1080p" selected>1080p Full HD</option>
+            <option value="4k">4K Ultra HD</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cam-dir">Direction</label>
+          <input id="cam-dir" class="form-control" type="text" name="direction" placeholder="e.g. Northbound">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cam-url">Stream URL (optional)</label>
+          <input id="cam-url" class="form-control" type="text" name="stream_url" placeholder="rtsp:// or /path/to/video.mp4">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">+ Add Camera</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add IoT Sensor -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">📡 Add IoT Sensor</span></div>
+    <div class="card-body">
+      <form method="post" action="{% url 'devices:add_sensor' %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="sen-name">Sensor Name</label>
+          <input id="sen-name" class="form-control" type="text" name="name" placeholder="e.g. Sensor-09" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sen-location">Location</label>
+          <select id="sen-location" name="location" class="form-control" required>
+            {% for loc in locations %}<option value="{{ loc.pk }}">{{ loc.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sen-type">Sensor Type</label>
+          <select id="sen-type" name="sensor_type" class="form-control">
+            <option value="speed">Speed Sensor</option>
+            <option value="volume" selected>Volume Counter</option>
+            <option value="occupancy">Occupancy Sensor</option>
+            <option value="weather">Weather Station</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sen-id">Device ID (auto if blank)</label>
+          <input id="sen-id" class="form-control" type="text" name="device_id" placeholder="e.g. IOT-0009">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">+ Add IoT Sensor</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Camera Table -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header">
+    <span class="card-title">📷 Cameras ({{ cameras|length }})</span>
+    <span class="badge badge-info">captureVideo()</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Location</th><th>Resolution</th><th>Direction</th><th>Status</th><th>Stream URL</th></tr></thead>
+        <tbody>
+          {% for cam in cameras %}
+          <tr>
+            <td style="font-weight:600">{{ cam.name }}</td>
+            <td>{{ cam.location.name }}</td>
+            <td><span class="badge badge-secondary">{{ cam.resolution }}</span></td>
+            <td style="color:var(--text-secondary)">{{ cam.direction|default:"—" }}</td>
+            <td>{% if cam.is_active %}<span class="badge badge-success">● Active</span>{% else %}<span class="badge badge-secondary">Offline</span>{% endif %}</td>
+            <td style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted)">{{ cam.stream_url|default:"Not configured"|truncatechars:40 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">No cameras configured</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Sensor Table -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">📡 IoT Sensors ({{ sensors|length }})</span>
+    <span class="badge badge-info">collectData()</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Device ID</th><th>Location</th><th>Type</th><th>Online</th><th>Last Ping</th></tr></thead>
+        <tbody>
+          {% for sensor in sensors %}
+          <tr>
+            <td style="font-weight:600">{{ sensor.name }}</td>
+            <td style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ sensor.device_id }}</td>
+            <td>{{ sensor.location.name }}</td>
+            <td><span class="badge badge-secondary">{{ sensor.sensor_type }}</span></td>
+            <td>{% if sensor.is_online %}<span class="badge badge-success">● Online</span>{% else %}<span class="badge badge-secondary">Offline</span>{% endif %}</td>
+            <td style="font-size:12px;color:var(--text-muted)">{{ sensor.last_ping|timesince|default:"Never" }}{% if sensor.last_ping %} ago{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">No sensors configured</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

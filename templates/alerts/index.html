@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Alerts{% endblock %}
+{% block page_title %}🔔 Traffic Alerts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Traffic Alerts</h1>
+  <p>{{ unresolved }} unresolved alert{{ unresolved|pluralize }} · Auto-refreshing</p>
+</div>
+
+{% if user.is_admin or user.is_officer %}
+<div style="display:flex;gap:12px;margin-bottom:20px">
+  <form method="post" action="{% url 'alerts:resolve_all' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success btn-sm">✅ Resolve All</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">All Alerts</span>
+    <span class="badge badge-danger">{{ unresolved }} active</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Location</th>
+            <th>Level</th>
+            <th>Severity</th>
+            <th>Congestion</th>
+            <th>Message</th>
+            <th>Status</th>
+            {% if user.is_admin or user.is_officer %}<th>Action</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in alerts %}
+          <tr>
+            <td style="font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap">{{ alert.timestamp|date:"d M H:i" }}</td>
+            <td style="font-weight:600">{{ alert.location.name }}</td>
+            <td><span class="badge badge-{{ alert.level }}">{{ alert.get_level_display }}</span></td>
+            <td><span class="badge badge-{{ alert.severity }}">{{ alert.severity }}</span></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;min-width:100px">
+                <div style="flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden">
+                  <div style="height:100%;width:{{ alert.congestion_index }}%;background:{{ alert.level_color }};border-radius:999px"></div>
+                </div>
+                <span style="font-size:12px;color:var(--text-secondary)">{{ alert.congestion_index|floatformat:0 }}</span>
+              </div>
+            </td>
+            <td style="max-width:300px;font-size:12px;color:var(--text-secondary)">{{ alert.message|truncatechars:80 }}</td>
+            <td>
+              {% if alert.is_resolved %}
+              <span class="badge badge-success">✅ Resolved</span>
+              {% else %}
+              <span class="badge badge-danger">● Active</span>
+              {% endif %}
+            </td>
+            {% if user.is_admin or user.is_officer %}
+            <td>
+              {% if not alert.is_resolved %}
+              <form method="post" action="{% url 'alerts:resolve' alert.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline btn-sm">Resolve</button>
+              </form>
+              {% else %}
+              <span style="font-size:11px;color:var(--text-muted)">{{ alert.resolved_at|time:"H:i" }}</span>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">✅ No alerts found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

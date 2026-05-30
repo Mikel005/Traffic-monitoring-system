@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Profile{% endblock %}
+{% block page_title %}👤 My Profile{% endblock %}
+
+{% block content %}
+<div style="max-width:600px">
+  <div class="card">
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:28px">
+        <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#4f8ef7,#6366f1);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;box-shadow:0 0 24px rgba(79,142,247,0.4)">
+          {{ user.role_icon }}
+        </div>
+        <div>
+          <h2 style="font-size:22px;font-weight:800">{{ user.get_full_name|default:user.username }}</h2>
+          <div style="color:var(--text-secondary);font-size:14px">{{ user.get_role_display }}</div>
+          <div style="margin-top:6px"><span class="badge badge-{% if user.is_active %}success{% else %}secondary{% endif %}">{% if user.is_active %}Active{% else %}Inactive{% endif %}</span></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">USERNAME</div>
+          <div style="font-weight:600;font-family:'JetBrains Mono',monospace">{{ user.username }}</div>
+        </div>
+        <div style="padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">EMAIL</div>
+          <div style="font-weight:600">{{ user.email|default:"Not set" }}</div>
+        </div>
+        <div style="padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">ROLE</div>
+          <div style="font-weight:600">{{ user.get_role_display }}</div>
+        </div>
+        <div style="padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">JOINED</div>
+          <div style="font-weight:600">{{ user.date_joined|date:"d M Y" }}</div>
+        </div>
+        <div style="padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">LAST LOGIN</div>
+          <div style="font-weight:600">{{ user.last_login|date:"d M Y H:i"|default:"First visit" }}</div>
+        </div>
+        <div style="padding:14px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">PHONE</div>
+          <div style="font-weight:600">{{ user.phone|default:"Not set" }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:10px">
+        <a href="/admin/accounts/user/{{ user.pk }}/change/" class="btn btn-outline">✏️ Edit Profile</a>
+        <a href="{% url 'accounts:logout' %}" class="btn btn-danger">🚪 Sign Out</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

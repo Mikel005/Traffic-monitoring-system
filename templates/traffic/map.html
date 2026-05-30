@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% block title %}Live Map{% endblock %}
+{% block page_title %}🗺️ Live Traffic Map{% endblock %}
+
+{% block extra_css %}
+<style>
+  .map-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; height: calc(100vh - 140px); }
+  #traffic-map { height: 100%; min-height: 500px; border-radius: 12px; border: 1px solid var(--border); }
+  .map-sidebar { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .map-legend { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .legend-dot  { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  @media (max-width: 900px) {
+    .map-layout { grid-template-columns: 1fr; height: auto; }
+    #traffic-map { height: 50vh; }
+  }
+  .gps-controls { display: flex; gap: 10px; margin-top: 10px; }
+  .btn-gps { 
+    background: #2563eb; color: #fff; border: none; padding: 8px 16px; 
+    border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; 
+  }
+  .btn-gps:hover { background: #1d4ed8; }
+  .btn-mock { background: #10b981; }
+  .btn-mock:hover { background: #059669; }
+  .gps-toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95); color: white; padding: 12px 24px;
+    border-radius: 30px; font-weight: 500; font-size: 14px;
+    box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4); border: 1px solid #ef4444;
+    z-index: 9999; display: flex; align-items: center; gap: 10px;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  .gps-toast.show { opacity: 1; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+  .user-marker {
+    background: #3b82f6; border: 3px solid white; border-radius: 50%;
+    animation: pulse 2s infinite; box-shadow: 0 0 8px rgba(0,0,0,0.5);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Real-Time Traffic Map</h1>
+  <p>Click any marker for live location details · Auto-refreshes every 10s</p>
+  <div class="gps-controls">
+    <button class="btn-gps" onclick="toggleGPS()" id="gps-btn">📍 Enable GPS Tracking</button>
+    <button class="btn-gps btn-mock" onclick="mockEnuguGPS()">🏙️ Mock Enugu Location</button>
+  </div>
+</div>
+
+<div class="map-layout">
+  <div id="traffic-map"></div>
+
+  <div class="map-sidebar">
+    <!-- Legend -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">🎨 Legend</span></div>
+      <div class="card-body">
+        <div class="map-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Free Flow (0–25)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Moderate (26–50)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> Heavy (51–75)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Gridlock (76–100)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Location list -->
+    <div class="card" style="flex:1">
+      <div class="card-header"><span class="card-title">📍 Locations</span></div>
+      <div class="card-body" style="padding:8px" id="map-location-list">
+        {% for loc in locations %}
+        {% with r=loc.latest_reading %}
+        <div class="location-card" style="--level-color:{{ loc.congestion_color }};margin-bottom:8px;cursor:pointer"
+             onclick="focusMarker({{ loc.pk }})">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:13px;font-weight:600">{{ loc.name }}</div>
+            {% if r %}<span class="badge badge-{{ r.congestion_level }}">{{ r.congestion_index|floatformat:0 }}</span>{% endif %}
+          </div>
+          {% if r %}
+          <div class="congestion-bar" style="margin-top:6px;height:4px">
+            <div class="congestion-fill" style="width:{{ r.congestion_index }}%;background:{{ loc.congestion_color }}"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">{{ r.avg_speed|floatformat:0 }} km/h · {{ r.vehicle_count }} vehicles</div>
+          {% endif %}
+        </div>
+        {% endwith %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const LOC_DATA = {{ loc_json|safe }};
+
+// Standard high-contrast tile layer instead of the dark one
+const map = L.map('traffic-map', { zoomControl: true }).setView([6.4483, 7.5139], 13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  maxZoom: 19,
+}).addTo(map);
+
+const markers = {};
+
+function makeIcon(color, congestion) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${congestion > 70 ? 36 : 28}px;
+      height:${congestion > 70 ? 36 : 28}px;
+      background:${color};
+      border-radius:50%;
+      border:3px solid rgba(255,255,255,0.8);
+      box-shadow:0 0 ${congestion > 70 ? 16 : 8}px ${color};
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:700;color:white;
+    ">${Math.round(congestion)}</div>`,
+    iconSize: [congestion > 70 ? 36 : 28, congestion > 70 ? 36 : 28],
+    iconAnchor: [congestion > 70 ? 18 : 14, congestion > 70 ? 18 : 14],
+  });
+}
+
+function initMarkers(data) {
+  data.forEach(loc => {
+    const icon   = makeIcon(loc.color, loc.congestion);
+    const marker = L.marker([loc.lat, loc.lng], { icon })
+      .addTo(map)
+      .bindPopup(`
+        <div style="min-width:200px;font-family:Inter,sans-serif">
+          <b style="font-size:14px">${loc.name}</b><br>
+          <hr style="border-color:#333;margin:6px 0">
+          <div>🚦 Congestion: <b>${loc.congestion}/100</b></div>
+          <div>💨 Avg Speed: <b>${loc.speed} km/h</b></div>
+          <div>🚗 Vehicles: <b>${loc.vehicles}</b></div>
+          <div style="margin-top:8px">
+            <a href="/location/${loc.id}/" style="color:#4f8ef7">View details →</a>
+          </div>
+        </div>
+      `);
+    markers[loc.id] = marker;
+  });
+}
+
+function focusMarker(id) {
+  const m = markers[id];
+  if (m) { map.flyTo(m.getLatLng(), 15, { duration: 1 }); m.openPopup(); }
+}
+
+initMarkers(LOC_DATA);
+
+// Refresh markers every 10s
+async function refreshMap() {
+  try {
+    const res  = await fetch("{% url 'traffic:api_live' %}");
+    const data = await res.json();
+    data.locations.forEach(loc => {
+      const m = markers[loc.id];
+      if (m) {
+        m.setIcon(makeIcon(loc.color, loc.congestion));
+        m.setPopupContent(`
+          <div style="min-width:200px;font-family:Inter,sans-serif">
+            <b style="font-size:14px">${loc.name}</b><br>
+            <hr style="border-color:#333;margin:6px 0">
+            <div>🚦 Congestion: <b>${loc.congestion}/100</b></div>
+            <div>💨 Avg Speed: <b>${loc.speed} km/h</b></div>
+            <div>🚗 Vehicles: <b>${loc.vehicles}</b></div>
+            <div style="margin-top:8px">
+              <a href="/location/${loc.id}/" style="color:#4f8ef7">View details →</a>
+            </div>
+          </div>
+        `);
+      }
+    });
+  } catch(e) {}
+  checkProximity(LOC_DATA); // Re-evaluate on data refresh
+}
+setInterval(refreshMap, 10000);
+
+// --- GPS Tracking & Proximity Logic ---
+let userMarker = null;
+let isTracking = false;
+let userLoc = null;
+
+// Create Toast Element
+const toastEl = document.createElement('div');
+toastEl.className = 'gps-toast';
+document.body.appendChild(toastEl);
+
+function showToast(msg) {
+  toastEl.innerHTML = `🚨 ${msg}`;
+  toastEl.classList.add('show');
+}
+function hideToast() {
+  toastEl.classList.remove('show');
+}
+
+// 1. Calculate Haversine distance in km
+function calcDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// 2. Proximity Alert
+function checkProximity(locDataArr) {
+  if (!userLoc) return;
+  let nearestHeavy = null;
+  let minDistance = 3.0; // 3km alert radius
+
+  locDataArr.forEach(loc => {
+    if (loc.congestion > 50) { // Heavy or Gridlock
+      const dist = calcDistance(userLoc.lat, userLoc.lng, loc.lat, loc.lng);
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestHeavy = loc;
+      }
+    }
+  });
+
+  if (nearestHeavy) {
+    showToast(`Traffic Ahead: ${nearestHeavy.name} is congested (${minDistance.toFixed(1)} km away)!`);
+  } else {
+    hideToast();
+  }
+}
+
+// 3. User Marker Rendering
+function updateUserLocation(lat, lng) {
+  userLoc = { lat, lng };
+  if (!userMarker) {
+    const icon = L.divIcon({ className: 'user-marker', iconSize: [16, 16] });
+    userMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
+      .bindPopup("<b>Your Vehicle Location</b>");
+    map.flyTo([lat, lng], 14);
+  } else {
+    userMarker.setLatLng([lat, lng]);
+  }
+  // Trigger proximity check instantly
+  checkProximity(LOC_DATA);
+}
+
+// Map Event Listeners
+map.on('locationfound', function(e) {
+  updateUserLocation(e.latlng.lat, e.latlng.lng);
+});
+map.on('locationerror', function(e) {
+  alert("Could not access GPS. Please ensure location permissions are granted.");
+  isTracking = false;
+  document.getElementById('gps-btn').innerHTML = "📍 Enable GPS Tracking";
+});
+
+// Controls
+function toggleGPS() {
+  const btn = document.getElementById('gps-btn');
+  if (!isTracking) {
+    isTracking = true;
+    btn.innerHTML = "🛑 Stop Tracking";
+    map.locate({ watch: true, enableHighAccuracy: true });
+  } else {
+    isTracking = false;
+    btn.innerHTML = "📍 Enable GPS Tracking";
+    map.stopLocate();
+    if (userMarker) {
+      map.removeLayer(userMarker);
+      userMarker = null;
+      userLoc = null;
+    }
+    hideToast();
+  }
+}
+
+function mockEnuguGPS() {
+  // Simulate being near Independence Layout
+  updateUserLocation(6.4440, 7.5220);
+  document.getElementById('gps-btn').innerHTML = "📍 Mock Active";
+}
+</script>
+{% endblock %}

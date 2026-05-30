@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Live Inference{% endblock %}
+{% block page_title %}Live Traffic Inference{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cyber-card {
+        background: rgba(10, 14, 26, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-top: 2px solid var(--accent);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+    }
+
+    .video-container {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+        position: relative;
+    }
+
+    .video-container::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        box-shadow: inset 0 0 20px rgba(79, 142, 247, 0.2);
+        pointer-events: none;
+        border-radius: 12px;
+    }
+
+    .data-card {
+        background: linear-gradient(180deg, rgba(20, 25, 45, 0.4) 0%, rgba(10, 15, 30, 0.8) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .data-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--card-color, var(--accent));
+        box-shadow: 0 0 15px var(--card-color, var(--accent));
+    }
+
+    .data-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -1px;
+        color: #ffffff;
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+    }
+
+    .data-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .status-badge {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        padding: 0.4rem 1rem;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.4);
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center g-4">
+    <div class="col-12 col-xl-9">
+        <div class="cyber-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3 mb-0"
+                        style="width: 40px; height: 40px; font-size: 1.2rem;">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 text-white fw-bold">Real-Time Tracker</h5>
+                        <div class="text-muted small" style="font-family: 'JetBrains Mono', monospace;">STREAM //
+                            YOLOv8 // {{ video.id }}</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="status-badge text-success">
+                        <span class="live-dot live me-2"></span>ONLINE
+                    </div>
+                    <a href="{% url 'vision:status' %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Vision
+                    </a>
+                </div>
+            </div>
+
+            <div class="ratio ratio-16x9 bg-black video-container">
+                <img src="{% url 'vision:stream_inference_feed' video.id %}" id="inferenceStream"
+                    class="w-100 h-100 object-fit-contain" alt="Live ML Inference Stream">
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-3">
+        <div class="cyber-card p-4 h-100 d-flex flex-column gap-3">
+            <h6 class="text-white fw-bold text-uppercase tracking-wider mb-2"
+                style="letter-spacing: 2px; font-size: 0.85rem;">Live Telemetry</h6>
+
+            <div class="data-card" style="--card-color: var(--info);">
+                <div class="data-label"><i class="bi bi-robot me-2"></i>AI Engine</div>
+                <div class="text-info fs-5 fw-bold mb-1">YOLOv8 Nano</div>
+                <div class="text-muted" style="font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">Classes:
+                    2,3,5,7 (Vehicles)</div>
+            </div>
+
+            <div class="data-card" style="--card-color: var(--primary);">
+                <div class="data-label">Total Vehicles Tracked</div>
+                <div class="d-flex align-items-end gap-3 mt-2">
+                    <div class="data-value" id="liveVehicles">--</div>
+                    <div class="spinner-grow spinner-grow-sm text-primary mb-2" role="status" id="loadingSpinner"></div>
+                </div>
+            </div>
+
+            <div class="data-card" style="--card-color: var(--success);">
+                <div class="data-label">Average Speed</div>
+                <div class="d-flex align-items-end gap-2 mt-2">
+                    <div class="data-value" id="liveSpeed">0.0</div>
+                    <div class="text-muted fw-bold mb-2">KM/H</div>
+                </div>
+            </div>
+
+            <div class="data-card flex-grow-1" style="--card-color: var(--warning);">
+                <div class="data-label">Congestion Status</div>
+                <div class="mt-2">
+                    <div class="data-value text-warning" style="font-size: 1.8rem;" id="liveStatus">ANALYZING</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const videoId = "{{ video.id }}";
+    const statsUrl = "{% url 'vision:inference_stats_api' video.id %}";
+
+    const countEl = document.getElementById('liveVehicles');
+    const speedEl = document.getElementById('liveSpeed');
+    const statusEl = document.getElementById('liveStatus');
+    const spinner = document.getElementById('loadingSpinner');
+
+    function fetchStats() {
+        fetch(statsUrl)
+            .then(res => res.json())
+            .then(data => {
+                countEl.innerText = data.vehicle_count;
+                speedEl.innerText = data.average_speed;
+                statusEl.innerText = data.predicted_congestion_level;
+
+                // Color code the status
+                statusEl.className = 'data-value text-warning';
+                let color = 'var(--warning)';
+                if (data.predicted_congestion_level === 'FREE FLOW') {
+                    statusEl.className = 'data-value text-success';
+                    color = 'var(--success)';
+                } else if (data.predicted_congestion_level === 'GRIDLOCK') {
+                    statusEl.className = 'data-value text-danger';
+                    color = 'var(--danger)';
+                } else if (data.predicted_congestion_level === 'HEAVY') {
+                    statusEl.className = 'data-value text-orange';
+                    color = 'var(--orange)';
+                }
+                statusEl.closest('.data-card').style.setProperty('--card-color', color);
+
+                if (data.status === 'completed') {
+                    spinner.style.display = 'none';
+                    statusEl.parentElement.parentElement.querySelector('.data-label').innerHTML = 'Final Status';
+                }
+            })
+            .catch(err => console.error("Error polling stats:", err));
+    }
+
+    // Poll every 1.5 seconds
+    const pollInterval = setInterval(fetchStats, 1500);
+    fetchStats(); // Initial call
+</script>
+{% endblock %}

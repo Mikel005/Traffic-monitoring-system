@@ -1,0 +1,151 @@
+/* ── Reset & base ─────────────────────────────────────────────── */
+:root {
+  --bg:        #0f1117;
+  --surface:   #13161f;
+  --surface2:  #1a1f2e;
+  --border:    rgba(255,255,255,0.06);
+  --accent:    #00e5ff;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --success:   #22c55e;
+  --warning:   #f59e0b;
+  --orange:    #f97316;
+  --danger:    #ef4444;
+  --info:      #00e5ff;
+}
+
+body {
+  background: var(--bg);
+  color:       var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size:   14px;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────── */
+#wrapper { min-height: 100vh; }
+
+#sidebar {
+  width:       220px;
+  min-width:   220px;
+  background:  var(--surface);
+  border-right: 1px solid var(--border);
+  height:      100vh;
+  position:    sticky;
+  top:         0;
+  overflow-y:  auto;
+  transition:  transform 0.25s;
+}
+
+.sidebar-title { font-size:14px; font-weight:700; color:#fff; }
+.sidebar-sub   { font-size:11px; }
+
+.sidebar-link {
+  color:         var(--muted);
+  font-size:     13px;
+  border-radius: 8px;
+  padding:       8px 12px;
+  margin-bottom: 2px;
+  transition:    all 0.15s;
+}
+.sidebar-link:hover { color:#fff; background: rgba(255,255,255,0.05); }
+.sidebar-link.active {
+  color:      var(--accent);
+  background: rgba(0,229,255,0.08);
+  border:     1px solid rgba(0,229,255,0.15);
+}
+
+/* Live indicator dot */
+.live-dot {
+  width:  8px;
+  height: 8px;
+  border-radius: 50%;
+  background:    var(--muted);
+  display:       inline-block;
+  transition:    background 0.3s;
+}
+.live-dot.live {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  animation:  pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:0.5; }
+}
+
+/* ── Top bar ──────────────────────────────────────────────────── */
+.topbar {
+  background:   var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-height:   56px;
+  position:     sticky;
+  top:          0;
+  z-index:      10;
+}
+
+/* ── Cards ────────────────────────────────────────────────────── */
+.card-dark {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* ── KPI cards ────────────────────────────────────────────────── */
+.kpi-card {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: 12px;
+  padding:       18px 20px;
+  height:        100%;
+  transition:    border-color 0.2s;
+}
+.kpi-card:hover { 
+  border-color: rgba(0,229,255,0.4); 
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.kpi-label { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px; }
+.kpi-value { font-size:28px; font-weight:700; line-height:1; }
+.kpi-sub   { font-size:12px; color:var(--muted); margin-top:4px; }
+
+/* ── Stat mini (location cards) ───────────────────────────────── */
+.stat-mini { padding:8px; background:var(--surface2); border-radius:8px; }
+.stat-mini-val   { font-size:18px; font-weight:700; }
+.stat-mini-label { font-size:10px; color:var(--muted); }
+
+/* ── Vehicle dot ──────────────────────────────────────────────── */
+.vehicle-dot {
+  width:12px; height:12px;
+  border-radius:50%; flex-shrink:0;
+}
+
+/* ── Text colours ─────────────────────────────────────────────── */
+.text-orange  { color: var(--orange) !important; }
+.bg-orange    { background-color: var(--orange) !important; color: white !important; }
+.text-accent  { color: var(--accent) !important; }
+
+/* ── Tables ───────────────────────────────────────────────────── */
+.table-dark { --bs-table-bg: var(--surface); --bs-table-hover-bg: var(--surface2); }
+.table-dark th { color: var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+
+/* ── Forms ────────────────────────────────────────────────────── */
+.form-control:focus, .form-select:focus {
+  border-color: var(--accent);
+  box-shadow:   0 0 0 2px rgba(0,229,255,0.15);
+}
+.bg-dark { background: var(--surface2) !important; }
+
+/* ── Progress bars ────────────────────────────────────────────── */
+.progress { background: var(--surface2); }
+
+/* ── Responsive: hide sidebar on small screens ─────────────────── */
+@media (max-width: 991px) {
+  #sidebar {
+    position: fixed;
+    left:     0; top: 0; bottom: 0;
+    transform: translateX(-100%);
+    z-index:  1000;
+  }
+  #sidebar.show { transform: translateX(0); }
+}

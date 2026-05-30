@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Traffic Monitor{% endblock %} — Intelligent Traffic System</title>
+  <meta name="description" content="Real-Time Intelligent Traffic Monitoring & Congestion Prediction System for Enugu">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar ────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🚦</div>
+      <div class="brand-title">TrafficIQ</div>
+      <div class="brand-sub">Enugu Monitoring System</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <a href="{% url 'traffic:dashboard' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="{% url 'traffic:map' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'map' %}active{% endif %}">
+        <span class="nav-icon">🗺️</span>
+        <span>Live Map</span>
+      </a>
+      <a href="{% url 'traffic:corridor' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'corridor' %}active{% endif %}">
+        <span class="nav-icon">🛣️</span>
+        <span>Route Predictor</span>
+      </a>
+
+      <div class="nav-section-label">Operations</div>
+      <a href="{% url 'alerts:list' %}"
+         class="nav-link {% if request.resolver_match.namespace == 'alerts' %}active{% endif %}">
+        <span class="nav-icon">🔔</span>
+        <span>Alerts</span>
+        {% if alert_count %}<span class="nav-badge">{{ alert_count }}</span>{% endif %}
+      </a>
+      <a href="{% url 'predictions:index' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'index' and request.resolver_match.namespace == 'predictions' %}active{% endif %}">
+        <span class="nav-icon">📈</span>
+        <span>Predictions</span>
+      </a>
+      <a href="{% url 'predictions:routes' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'routes' %}active{% endif %}">
+        <span class="nav-icon">🛣️</span>
+        <span>Alt. Routes</span>
+      </a>
+
+      {% if user.is_admin or user.is_officer %}
+      <div class="nav-section-label">Computer Vision</div>
+      <a href="{% url 'vision:status' %}"
+         class="nav-link {% if request.resolver_match.namespace == 'vision' and request.resolver_match.url_name == 'status' %}active{% endif %}">
+        <span class="nav-icon">👁️</span>
+        <span>Vision Status</span>
+      </a>
+      {% endif %}
+      {% if user.is_admin %}
+      <a href="{% url 'vision:upload_video' %}"
+         class="nav-link {% if request.resolver_match.namespace == 'vision' and request.resolver_match.url_name == 'upload_video' %}active{% endif %}">
+        <span class="nav-icon">📤</span>
+        <span>Upload Feed</span>
+      </a>
+      {% endif %}
+
+      {% if user.is_admin or user.is_officer %}
+      <div class="nav-section-label">Management</div>
+      <a href="{% url 'traffic:reports' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+        <span class="nav-icon">📋</span>
+        <span>Reports</span>
+      </a>
+      {% endif %}
+
+      {% if user.is_admin %}
+      <a href="{% url 'devices:list' %}"
+         class="nav-link {% if request.resolver_match.namespace == 'devices' %}active{% endif %}">
+        <span class="nav-icon">📷</span>
+        <span>Devices</span>
+      </a>
+      <a href="{% url 'accounts:manage_users' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">
+        <span class="nav-icon">👥</span>
+        <span>Users</span>
+      </a>
+      <a href="/admin/"
+         class="nav-link">
+        <span class="nav-icon">⚙️</span>
+        <span>Admin Panel</span>
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">{{ user.role_icon }}</div>
+        <div>
+          <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+          <div class="user-role">{{ user.get_role_display }}</div>
+        </div>
+        <div class="user-actions">
+          <a href="{% url 'accounts:logout' %}" class="btn-icon" title="Logout">🚪</a>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────── -->
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+      <div class="topbar-actions">
+        <span class="live-dot">Live</span>
+        {% if alert_count %}
+        <a href="{% url 'alerts:list' %}" class="btn btn-outline btn-sm">
+          🔔 {{ alert_count }} alert{{ alert_count|pluralize }}
+        </a>
+        {% endif %}
+        <a href="{% url 'accounts:profile' %}" class="btn btn-outline btn-sm">
+          {{ user.role_icon }} {{ user.username }}
+        </a>
+      </div>
+    </header>
+
+    <main class="page-body">
+      <!-- Toast messages -->
+      {% if messages %}
+      <div class="messages-container" id="messages-container">
+        {% for msg in messages %}
+        <div class="toast toast-{% if msg.tags == 'error' %}error{% elif msg.tags == 'success' %}success{% elif msg.tags == 'warning' %}warning{% else %}info{% endif %}">
+          {% if msg.tags == 'success' %}✅{% elif msg.tags == 'error' %}❌{% elif msg.tags == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+          {{ msg }}
+        </div>
+        {% endfor %}
+      </div>
+      <script>
+        setTimeout(() => {
+          const c = document.getElementById('messages-container');
+          if (c) c.style.display = 'none';
+        }, 5000);
+      </script>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

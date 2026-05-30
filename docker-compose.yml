@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL + TimescaleDB ──────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: traffic_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     traffic_user
+      POSTGRES_PASSWORD: traffic_pass
+      POSTGRES_DB:       traffic_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traffic_user -d traffic_db"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  # ── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: traffic_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries:  5
+
+  # ── Django (Daphne ASGI — supports HTTP + WebSocket) ──────
+  web:
+    build: .
+    container_name: traffic_web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - .:/app
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_data &&
+             daphne -b 0.0.0.0 -p 8000 traffic_project.asgi:application"
+
+  # ── Celery worker ─────────────────────────────────────────
+  celery:
+    build: .
+    container_name: traffic_celery
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+    env_file: .env
+    volumes:
+      - .:/app
+    command: celery -A traffic_project worker --loglevel=info --concurrency=2
+
+  # ── Celery Beat (scheduler) ───────────────────────────────
+  celery_beat:
+    build: .
+    container_name: traffic_beat
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+    env_file: .env
+    volumes:
+      - .:/app
+    command: celery -A traffic_project beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+volumes:
+  postgres_data:

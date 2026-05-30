@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}📊 Live Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; background: linear-gradient(135deg, rgba(79,142,247,0.15), transparent); padding: 24px 30px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 28px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+  <div>
+    <h1 style="font-size: 32px; font-weight: 800; letter-spacing: -0.5px; background: -webkit-linear-gradient(45deg, #fff, #a5b4fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Traffic Overview — Enugu</h1>
+    <p style="margin-top: 8px; font-size: 15px; color: var(--text-secondary);">Real-time intelligent monitoring across <strong style="color:var(--text-primary)">{{ active_locations }}</strong> active locations</p>
+  </div>
+  <div style="background: rgba(10,14,26,0.6); backdrop-filter: blur(8px); padding: 12px 24px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 2px 10px rgba(255,255,255,0.05);">
+    <span class="live-dot" style="font-weight: 700; letter-spacing: 0.05em; font-size: 13px;">SYSTEM LIVE · 5S SYNC</span>
+  </div>
+</div>
+
+<!-- ── Stat Cards ───────────────────────────────────── -->
+<div class="stats-grid" id="dashboard-stats">
+  <div class="stat-card" style="--accent-color:#4f8ef7">
+    <div class="stat-icon">📍</div>
+    <div class="stat-value" id="stat-locations">{{ active_locations }}</div>
+    <div class="stat-label">Active Locations</div>
+  </div>
+  <div class="stat-card" style="--accent-color:#22c55e">
+    <div class="stat-icon">🚗</div>
+    <div class="stat-value" id="stat-vehicles">{{ total_vehicles }}</div>
+    <div class="stat-label">Vehicles Detected</div>
+  </div>
+  <div class="stat-card" style="--accent-color:#f59e0b">
+    <div class="stat-icon">📈</div>
+    <div class="stat-value" id="stat-congestion">{{ avg_congestion }}<span style="font-size:14px;font-weight:500">/100</span></div>
+    <div class="stat-label">Avg. Congestion Index</div>
+  </div>
+  <div class="stat-card" style="--accent-color:#ef4444">
+    <div class="stat-icon">🚨</div>
+    <div class="stat-value" id="stat-gridlock">{{ gridlock_count }}</div>
+    <div class="stat-label">Gridlock Zones</div>
+  </div>
+</div>
+<!-- ── Main Grid ─────────────────────────────────────── -->
+<div class="grid-2" style="margin-bottom:20px" id="dashboard-main-grid">
+  <!-- Congestion Chart -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📉 24-Hour Congestion Trend</span>
+      <span class="badge badge-info">System-wide avg</span>
+    </div>
+    <div class="card-body">
+      <canvas id="congestion-chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Active alerts -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🔔 Active Alerts</span>
+      <a href="{% url 'alerts:list' %}" class="btn btn-outline btn-sm">View all</a>
+    </div>
+    <div class="card-body" style="padding:12px" id="alerts-panel">
+      {% for alert in recent_alerts %}
+      <div class="alert-item" style="--level-color:{{ alert.level_color }}">
+        <div class="alert-dot"></div>
+        <div class="alert-content">
+          <div class="alert-location">{{ alert.location.name }}</div>
+          <div class="alert-msg">{{ alert.message|truncatechars:80 }}</div>
+          <div class="alert-time">{{ alert.timestamp|timesince }} ago</div>
+        </div>
+        <span class="badge badge-{{ alert.severity }}">{{ alert.severity }}</span>
+      </div>
+      {% empty %}
+      <div style="text-align:center;padding:30px;color:var(--text-muted)">
+        ✅ No active alerts
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Location Cards Grid ───────────────────────────── -->
+<div class="card" id="dashboard-location-card">
+  <div class="card-header">
+    <span class="card-title">🗺️ Location Status</span>
+    <a href="{% url 'traffic:map' %}" class="btn btn-outline btn-sm">Open Map</a>
+  </div>
+  <div class="card-body">
+    <div class="grid-auto" id="location-grid">
+      {% for loc in locations %}
+      {% with r=loc.latest_reading %}
+      <a href="{% url 'traffic:location_detail' loc.pk %}" style="text-decoration:none">
+        <div class="location-card" style="--level-color:{{ loc.congestion_color }}">
+          <div class="loc-header">
+            <div>
+              <div class="loc-name">{{ loc.name }}</div>
+              <div class="loc-city">{{ loc.road_name|default:loc.city }}</div>
+            </div>
+            {% if r %}
+            <span class="badge badge-{{ r.congestion_level }}">{{ r.get_congestion_level_display }}</span>
+            {% endif %}
+          </div>
+          {% if r %}
+          <div class="congestion-bar-wrap">
+            <div class="congestion-label">
+              <span>Congestion</span>
+              <span>{{ r.congestion_index|floatformat:1 }}/100</span>
+            </div>
+            <div class="congestion-bar">
+              <div class="congestion-fill" style="width:{{ r.congestion_index }}%;background:{{ loc.congestion_color }}"></div>
+            </div>
+          </div>
+          <div class="loc-stats">
+            <div class="loc-stat">🚗 {{ r.vehicle_count }} veh</div>
+            <div class="loc-stat">💨 {{ r.avg_speed|floatformat:1 }} km/h</div>
+            <div class="loc-stat">🕐 {{ r.timestamp|time:"H:i" }}</div>
+          </div>
+          {% else %}
+          <div style="color:var(--text-muted);font-size:12px;padding:8px 0">No data yet</div>
+          {% endif %}
+        </div>
+      </a>
+      {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Chart setup
+const ctx = document.getElementById('congestion-chart').getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+gradient.addColorStop(0, 'rgba(79,142,247,0.5)');
+gradient.addColorStop(1, 'rgba(79,142,247,0.0)');
+
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [{
+      label: 'Avg Congestion Index',
+      data: {{ chart_data|safe }},
+      borderColor: '#4f8ef7',
+      backgroundColor: gradient,
+      borderWidth: 3,
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointBackgroundColor: '#0a0e1a',
+      pointBorderColor: '#4f8ef7',
+      pointBorderWidth: 2,
+      pointHoverRadius: 6,
+      pointHoverBackgroundColor: '#4f8ef7',
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color:'rgba(255,255,255,0.04)' }, ticks: { color:'#8b9bc4', maxTicksLimit:8 } },
+      y: { grid: { color:'rgba(255,255,255,0.04)' }, ticks: { color:'#8b9bc4' }, min:0, max:100 }
+    }
+  }
+});
+
+// Live polling — update stats every 5 seconds
+async function pollLive() {
+  try {
+    const res  = await fetch("{% url 'traffic:api_live' %}");
+    const data = await res.json();
+
+    // Update stat tiles with a subtle flash effect to show data change
+    let totalVeh = 0, totalCong = 0, gridlockN = 0;
+    data.locations.forEach(l => {
+      totalVeh  += l.vehicles;
+      totalCong += l.congestion;
+      if (l.level === 'gridlock') gridlockN++;
+    });
+    const n = data.locations.length || 1;
+    
+    function updateVal(id, newVal) {
+        const el = document.getElementById(id);
+        if (el.innerHTML !== newVal) {
+            el.innerHTML = newVal;
+            el.style.transform = 'scale(1.1)';
+            el.style.color = 'var(--text-primary)';
+            setTimeout(() => {
+                el.style.transform = 'scale(1)';
+            }, 300);
+        }
+    }
+    
+    updateVal('stat-vehicles', totalVeh);
+    updateVal('stat-congestion', (totalCong/n).toFixed(1) + '<span style="font-size:14px;font-weight:500">/100</span>');
+    updateVal('stat-gridlock', gridlockN);
+
+    // Update chart
+    chart.data.labels   = data.chart_labels;
+    chart.data.datasets[0].data = data.chart_data;
+    chart.update(); // remove 'none' for smooth animation
+
+    // Update alert count badge
+    const badge = document.querySelector('.nav-badge');
+    if (badge) badge.textContent = data.alert_count || '';
+  } catch(e) {}
+}
+setInterval(pollLive, 5000);
+pollLive();
+
+// Add smooth transitions for the stat values
+document.querySelectorAll('.stat-value').forEach(el => {
+    el.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.3s ease';
+});
+
+
+</script>
+{% endblock %}

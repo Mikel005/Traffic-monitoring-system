@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — TrafficIQ Monitor</title>
+  <meta name="description" content="Sign in to the Real-Time Intelligent Traffic Monitoring System">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg-primary); }
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0;
+      background-image: linear-gradient(rgba(79,142,247,0.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(79,142,247,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .glow-orb {
+      position: fixed; width: 600px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(79,142,247,0.12), transparent 70%);
+      pointer-events: none;
+    }
+    .glow-orb-1 { top: -200px; left: -200px; }
+    .glow-orb-2 { bottom: -200px; right: -200px; background: radial-gradient(circle, rgba(99,102,241,0.1), transparent 70%); }
+    .login-wrap { position: relative; z-index: 1; width: 100%; max-width: 440px; padding: 20px; }
+    .login-header { text-align: center; margin-bottom: 36px; }
+    .login-brand-icon {
+      width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--accent), #6366f1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; box-shadow: 0 0 40px rgba(79,142,247,0.4);
+    }
+    .login-title { font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+    .login-sub   { color: var(--text-secondary); font-size: 14px; }
+    .login-card  {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      backdrop-filter: blur(16px);
+    }
+    .login-card:hover { border-color: var(--border-hover); }
+    .error-msg {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
+      color: #ef4444; padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; margin-bottom: 16px;
+    }
+    .btn-login {
+      width: 100%; padding: 12px; font-size: 15px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #6366f1);
+      color: white; border: none; border-radius: 10px; cursor: pointer;
+      transition: all 0.25s; margin-top: 8px;
+    }
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(79,142,247,0.45);
+    }
+    .login-hint {
+      text-align: center; margin-top: 24px;
+      font-size: 12px; color: var(--text-muted);
+    }
+    .role-pills { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+    .role-pill {
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+      font-size: 11px; color: var(--text-secondary); cursor: pointer;
+      transition: all 0.2s; background: var(--bg-card);
+    }
+    .role-pill:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="glow-orb glow-orb-1"></div>
+<div class="glow-orb glow-orb-2"></div>
+
+<div class="login-wrap">
+  <div class="login-header">
+    <div class="login-brand-icon">🚦</div>
+    <h1 class="login-title">TrafficIQ</h1>
+    <p class="login-sub">Real-Time Intelligent Traffic Monitoring<br>& Congestion Prediction — Enugu</p>
+  </div>
+
+  <div class="login-card">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:20px;">Sign in to your account</h2>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="error-msg">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'accounts:login' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.GET.next }}">
+
+      <div class="form-group">
+        <label class="form-label" for="login-username">Username</label>
+        <input id="login-username" class="form-control" type="text" name="username"
+               placeholder="Enter your username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="login-password">Password</label>
+        <input id="login-password" class="form-control" type="password" name="password"
+               placeholder="Enter your password" autocomplete="current-password" required>
+      </div>
+
+      <button type="submit" class="btn-login">Sign In →</button>
+    </form>
+
+    <div class="login-hint">
+      Quick access — click to fill credentials:
+      <div class="role-pills">
+        <div class="role-pill" onclick="fill('admin','admin123')">🛡️ Admin</div>
+        <div class="role-pill" onclick="fill('officer1','officer123')">👮 Officer</div>
+        <div class="role-pill" onclick="fill('roaduser1','user123')">🚗 Road User</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fill(u, p) {
+  document.getElementById('login-username').value = u;
+  document.getElementById('login-password').value = p;
+}
+</script>
+</body>
+</html>

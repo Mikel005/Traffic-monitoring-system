@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Predictions{% endblock %}
+{% block page_title %}Congestion Predictions{% endblock %}
+
+{% block content %}
+
+<!-- ── Location selector ──────────────────────────────────────── -->
+<form method="get" class="d-flex align-items-center gap-3 mb-4">
+  <label class="text-muted small">Location:</label>
+  <select name="location_id" class="form-select form-select-sm w-auto bg-dark text-light border-secondary"
+          onchange="this.form.submit()">
+    {% for loc in locations %}
+    <option value="{{ loc.id }}" {% if loc.id == selected.id %}selected{% endif %}>
+      {{ loc.name }}
+    </option>
+    {% endfor %}
+  </select>
+</form>
+
+{% if forecast.error %}
+  <div class="text-center py-5 text-muted card-dark">
+    <i class="bi bi-info-circle fs-1 d-block mb-3 text-info"></i>
+    <p class="mb-0">{{ forecast.error }}</p>
+    {% if not locations %}
+      <small>Please seed the database or add locations in the admin panel.</small>
+    {% endif %}
+  </div>
+{% else %}
+
+<!-- ── Current state ──────────────────────────────────────────── -->
+<div class="card-dark p-4 mb-4">
+  <div class="row align-items-center">
+    <div class="col-auto">
+      <div class="kpi-label mb-1">Current Congestion</div>
+      <div class="display-5 fw-bold
+        {% if forecast.current_index > 75 %}text-danger
+        {% elif forecast.current_index > 50 %}text-warning
+        {% elif forecast.current_index > 25 %}text-orange
+        {% else %}text-success{% endif %}">
+        {{ forecast.current_index|floatformat:1 }}
+        <span class="fs-6 fw-normal text-muted">/ 100</span>
+      </div>
+    </div>
+    <div class="col-auto">
+      <span class="badge bg-{% if forecast.current_level == 'gridlock' %}danger{% elif forecast.current_level == 'heavy' %}warning{% elif forecast.current_level == 'moderate' %}info{% else %}success{% endif %} fs-6 px-3 py-2">
+        {{ forecast.current_level|title }}
+      </span>
+    </div>
+    <div class="col ms-auto text-end">
+      <div class="text-muted small">Model: {{ forecast.model_version }}</div>
+      <div class="text-muted small">Confidence: {{ forecast.confidence|floatformat:0 }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Forecast gauges ────────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+  {% for label, value, color in forecast_display %}
+  <div class="col-12 col-md-4">
+    <div class="card-dark p-4 text-center">
+      <div class="text-muted small mb-3 text-uppercase tracking-wide">{{ label }}</div>
+      <!-- SVG gauge -->
+      <div class="gauge-wrap mx-auto mb-3" style="width:140px; height:80px; position:relative;">
+        <svg viewBox="0 0 100 55" xmlns="http://www.w3.org/2000/svg">
+          <!-- background arc -->
+          <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="#1e2435" stroke-width="10" stroke-linecap="round"/>
+          <!-- value arc -->
+          <path d="M10,50 A40,40 0 0,1 90,50" fill="none"
+                stroke="{{ color }}" stroke-width="10" stroke-linecap="round"
+                stroke-dasharray="{{ value|floatformat:0 }} 100"
+                style="transition: stroke-dasharray 0.5s;"/>
+          <!-- value text -->
+          <text x="50" y="48" text-anchor="middle" fill="white" font-size="16" font-weight="bold">
+            {{ value|floatformat:0 }}
+          </text>
+          <text x="50" y="56" text-anchor="middle" fill="#64748b" font-size="7">/ 100</text>
+        </svg>
+      </div>
+      <div class="fw-semibold" style="color:{{ color }}">
+        {% if value <= 25 %}Free Flow{% elif value <= 50 %}Moderate{% elif value <= 75 %}Heavy{% else %}Gridlock{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Forecast chart ─────────────────────────────────────────── -->
+<div class="card-dark p-4">
+  <h6 class="mb-3 fw-semibold">Congestion Forecast Timeline</h6>
+  <canvas id="forecastChart" height="120"></canvas>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{% if not forecast.error %}
+<script>
+const ctx = document.getElementById('forecastChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels:   ['Now', '+15 min', '+30 min', '+60 min'],
+    datasets: [{
+      data: [
+        {{ forecast.current_index|floatformat:1 }},
+        {{ forecast.pred_15min|floatformat:1 }},
+        {{ forecast.pred_30min|floatformat:1 }},
+        {{ forecast.pred_60min|floatformat:1 }},
+      ],
+      backgroundColor: [
+        '#00e5ff44',
+        '#00e5ff88',
+        '#00e5ffaa',
+        '#00e5ffcc',
+      ],
+      borderColor:  '#00e5ff',
+      borderWidth:  2,
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e2435' } },
+      y: { min: 0, max: 100, ticks: { color: '#94a3b8' }, grid: { color: '#1e2435' } }
+    }
+  }
+});
+
+// Auto-refresh predictions every 60 seconds
+setTimeout(() => location.reload(), 60000);
+</script>
+{% endif %}
+{% endblock %}

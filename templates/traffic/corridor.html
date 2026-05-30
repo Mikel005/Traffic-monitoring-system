@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}Route Predictor{% endblock %}
+{% block page_title %}🛣️ Route & Corridor Predictor{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:20px" id="dashboard-route-predictor">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <span class="card-title">🛣️ Plan Your Route</span>
+    <button id="btn-clear-route" class="btn btn-outline btn-sm" style="display:none;" onclick="clearCorridor()">✖ Clear Route</button>
+  </div>
+  <div class="card-body">
+    <div class="route-planner-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      
+      <!-- Inputs -->
+      <div class="route-inputs">
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;">Start Location</label>
+          <div style="display:flex; gap:10px;">
+            <select id="corridor-start" class="form-select bg-dark text-light border-secondary" style="flex:1; padding:6px; border-radius:4px;">
+              <option value="">Select origin...</option>
+              {% for loc in locations %}
+                <option value="{{ loc.pk }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+            <button id="btn-track-location" class="btn btn-outline btn-sm" style="white-space:nowrap;" onclick="trackLocation()">📍 Use My Location</button>
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px;">Destination</label>
+          <select id="corridor-end" class="form-select bg-dark text-light border-secondary" style="width:100%; padding:6px; border-radius:4px;" onchange="fetchCorridor()">
+            <option value="">Select destination...</option>
+            {% for loc in locations %}
+              <option value="{{ loc.pk }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Results Display -->
+      <div class="route-results" id="corridor-results" style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="color:var(--text-muted); font-size:14px; text-align:center; padding-top:20px;">
+          Select a Start and Destination to see predictions along your route.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+if (document.getElementById('corridor-start')) {
+  document.getElementById('corridor-start').addEventListener('change', fetchCorridor);
+}
+
+function trackLocation() {
+  const btn = document.getElementById('btn-track-location');
+  btn.textContent = "📍 Locating...";
+  
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser");
+    btn.textContent = "📍 Use My Location";
+    return;
+  }
+  
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const res = await fetch(`/api/nearest/?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
+      const data = await res.json();
+      if (data.id) {
+        document.getElementById('corridor-start').value = data.id;
+        btn.textContent = "📍 Using: " + data.name;
+        fetchCorridor();
+      } else {
+        btn.textContent = "📍 Not found";
+      }
+    } catch(e) {
+      console.error(e);
+      btn.textContent = "📍 Error";
+    }
+  }, () => {
+    alert("Unable to retrieve your location");
+    btn.textContent = "📍 Use My Location";
+  });
+}
+
+async function fetchCorridor() {
+  const startId = document.getElementById('corridor-start').value;
+  const endId = document.getElementById('corridor-end').value;
+  
+  if (!startId || !endId) return;
+  
+  const resultsDiv = document.getElementById('corridor-results');
+  resultsDiv.innerHTML = '<div style="text-align:center; padding: 20px;"><span class="live-dot">Calculating route...</span></div>';
+  
+  try {
+    const res = await fetch(`/api/corridor/?start=${startId}&end=${endId}`);
+    const data = await res.json();
+    
+    if (data.error) {
+      resultsDiv.innerHTML = `<div style="color:#ef4444;">${data.error}</div>`;
+      return;
+    }
+    
+    document.getElementById('btn-clear-route').style.display = 'block';
+    
+    let html = `
+      <div style="display:flex; justify-content:space-between; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-size: 14px;">
+        <div><span style="color:var(--text-muted);">Est. Time:</span> <strong>${data.est_time_mins} mins</strong></div>
+        <div><span style="color:var(--text-muted);">Distance:</span> <strong>${data.distance_km} km</strong></div>
+      </div>
+      <div style="position: relative; padding-left: 15px; border-left: 2px dashed rgba(255,255,255,0.2);">
+    `;
+    
+    data.locations.forEach((loc, idx) => {
+      let badges = '';
+      if(loc.prediction.m15) badges += `<span class="badge badge-${loc.prediction.m15}" style="margin-right:4px;">15m: ${loc.prediction.m15.replace('_',' ')}</span>`;
+      if(loc.prediction.m30) badges += `<span class="badge badge-${loc.prediction.m30}" style="margin-right:4px;">30m: ${loc.prediction.m30.replace('_',' ')}</span>`;
+      if(loc.prediction.m60) badges += `<span class="badge badge-${loc.prediction.m60}">60m: ${loc.prediction.m60.replace('_',' ')}</span>`;
+      
+      let dotColor = loc.prediction.m15 === 'gridlock' ? '#ef4444' : (loc.prediction.m15 === 'heavy' ? '#f97316' : (loc.prediction.m15 === 'moderate' ? '#f59e0b' : '#22c55e'));
+      
+      html += `
+        <div style="margin-bottom: 15px; position: relative;">
+          <div style="position: absolute; left: -21px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: ${dotColor}; box-shadow: 0 0 5px ${dotColor};"></div>
+          <div style="font-weight: 500; font-size: 14px; margin-bottom: 4px;">${idx === 0 ? '🏁 Start: ' : (idx === data.locations.length-1 ? '🎯 End: ' : '📍 ')}${loc.name}</div>
+          <div>${badges}</div>
+        </div>
+      `;
+    });
+    
+    html += '</div>';
+    resultsDiv.innerHTML = html;
+    
+  } catch(e) {
+    resultsDiv.innerHTML = '<div style="color:#ef4444;">Error fetching corridor data.</div>';
+  }
+}
+
+function clearCorridor() {
+  document.getElementById('corridor-start').value = '';
+  document.getElementById('corridor-end').value = '';
+  document.getElementById('btn-track-location').textContent = "📍 Use My Location";
+  
+  const resultsDiv = document.getElementById('corridor-results');
+  resultsDiv.innerHTML = `
+    <div style="color:var(--text-muted); font-size:14px; text-align:center; padding-top:20px;">
+      Select a Start and Destination to see predictions along your route.
+    </div>
+  `;
+  document.getElementById('btn-clear-route').style.display = 'none';
+}
+</script>
+{% endblock %}
