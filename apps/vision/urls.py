@@ -11,6 +11,10 @@ urlpatterns = [
     path('stream_feed/<int:video_id>/',   views.stream_inference_feed,name='stream_inference_feed'),
     path('api/stats/<int:video_id>/',     views.inference_stats_api,  name='inference_stats_api'),
 
+    # ── Count sessions & CSV ──────────────────────────────────────
+    path('sessions/',                        views.session_list,         name='sessions'),
+    path('sessions/<int:session_id>/csv/',   views.download_csv,         name='download_csv'),
+
     # ── Camera management ──────────────────────────────────────────
     path('cameras/',                      views.camera_list,          name='cameras'),
     path('cameras/add/',                  views.camera_create,        name='camera_create'),

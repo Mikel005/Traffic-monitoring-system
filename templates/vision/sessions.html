@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Count Sessions{% endblock %}
+{% block page_title %}Vehicle Count Sessions{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge-inbound  { background:rgba(34,197,94,0.15);  color:#22c55e; border:1px solid rgba(34,197,94,0.3);  border-radius:4px; padding:2px 8px; font-size:0.72rem; font-weight:700; }
+.badge-outbound { background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.3); border-radius:4px; padding:2px 8px; font-size:0.72rem; font-weight:700; }
+.level-free     { color:#22c55e; }
+.level-moderate { color:#f59e0b; }
+.level-heavy    { color:#f97316; }
+.level-gridlock { color:#ef4444; }
+.mono { font-family:'JetBrains Mono',monospace; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card p-4"
+     style="background:linear-gradient(145deg,rgba(15,22,40,0.9),rgba(10,14,26,0.9));
+            border-left:4px solid var(--accent);">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="fw-bold text-white mb-0">
+      <i class="bi bi-table me-2 text-primary"></i>Detection Sessions
+    </h5>
+    <a href="{% url 'vision:status' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Vision Status
+    </a>
+  </div>
+
+  {% if sessions %}
+  <div class="table-responsive">
+    <table class="table table-dark table-hover mb-0" style="font-size:0.83rem;">
+      <thead>
+        <tr style="color:#64748b;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;">
+          <th class="border-0 pb-3">Session</th>
+          <th class="border-0 pb-3">Location</th>
+          <th class="border-0 pb-3">Total</th>
+          <th class="border-0 pb-3">🚗 Car</th>
+          <th class="border-0 pb-3">🚛 Truck</th>
+          <th class="border-0 pb-3">🚌 Bus</th>
+          <th class="border-0 pb-3">🏍 Moto</th>
+          <th class="border-0 pb-3">Direction</th>
+          <th class="border-0 pb-3">Avg Speed</th>
+          <th class="border-0 pb-3">Peak Level</th>
+          <th class="border-0 pb-3">Started</th>
+          <th class="border-0 pb-3">CSV</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td class="border-0 py-2 mono text-muted" style="font-size:0.7rem;">
+            {{ s.session_tag|truncatechars:20 }}
+          </td>
+          <td class="border-0 py-2 text-white">{{ s.location.name|default:"—" }}</td>
+          <td class="border-0 py-2 text-white fw-bold mono">{{ s.total_count }}</td>
+          <td class="border-0 py-2 mono">{{ s.car_count }}</td>
+          <td class="border-0 py-2 mono">{{ s.truck_count }}</td>
+          <td class="border-0 py-2 mono">{{ s.bus_count }}</td>
+          <td class="border-0 py-2 mono">{{ s.motorcycle_count }}</td>
+          <td class="border-0 py-2">
+            <span class="badge-inbound">IN {{ s.inbound_count }}</span>
+            <span class="badge-outbound ms-1">OUT {{ s.outbound_count }}</span>
+          </td>
+          <td class="border-0 py-2 mono">{{ s.avg_speed }} km/h</td>
+          <td class="border-0 py-2 fw-bold">
+            {% with lvl=s.peak_congestion %}
+              {% if lvl == "FREE FLOW" %}<span class="level-free">{{ lvl }}</span>
+              {% elif lvl == "MODERATE" %}<span class="level-moderate">{{ lvl }}</span>
+              {% elif lvl == "HEAVY" %}<span class="level-heavy">{{ lvl }}</span>
+              {% elif lvl == "GRIDLOCK" %}<span class="level-gridlock">{{ lvl }}</span>
+              {% else %}<span class="text-muted">{{ lvl }}</span>
+              {% endif %}
+            {% endwith %}
+          </td>
+          <td class="border-0 py-2 text-muted" style="font-size:0.72rem;">
+            {{ s.started_at|date:"M d, H:i" }}
+          </td>
+          <td class="border-0 py-2">
+            {% if s.csv_file %}
+            <a href="{% url 'vision:download_csv' s.id %}"
+               class="btn btn-sm btn-outline-success py-0 px-2" title="Download CSV">
+              <i class="bi bi-download"></i>
+            </a>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-5">
+    <i class="bi bi-table fs-1 d-block mb-3"></i>
+    No counting sessions recorded yet.<br>
+    <span style="font-size:0.8rem;">
+      Process a video or run <code>python manage.py run_detector --video &lt;file&gt;</code>
+    </span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

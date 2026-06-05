@@ -195,6 +195,35 @@ def camera_stream_view(request, camera_id):
 
 
 @login_required
+def session_list(request):
+    """Show all VehicleCountSession records with download links."""
+    from .models import VehicleCountSession
+    sessions = VehicleCountSession.objects.select_related('location').order_by('-started_at')[:50]
+    return render(request, 'vision/sessions.html', {
+        'sessions': sessions,
+        'page':     'vision',
+    })
+
+
+@login_required
+def download_csv(request, session_id):
+    """Serve the per-crossing CSV file for a completed session."""
+    from .models import VehicleCountSession
+    import mimetypes
+    from django.http import FileResponse, Http404
+    session = get_object_or_404(VehicleCountSession, pk=session_id)
+    if not session.csv_file:
+        raise Http404("No CSV file for this session.")
+    response = FileResponse(
+        session.csv_file.open('rb'),
+        content_type='text/csv',
+    )
+    filename = f"vehicle_counts_{session.session_tag}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
 def camera_stream_feed(request, camera_id):
     camera   = get_object_or_404(Camera, pk=camera_id, is_active=True)
     detector = VehicleDetector(model_path=str(settings.YOLO_WEIGHTS_PATH))
