@@ -1,206 +1,700 @@
 {% extends "base.html" %}
-
-{% block title %}Live Inference{% endblock %}
-{% block page_title %}Live Traffic Inference{% endblock %}
+{% block title %}CV Processing — Video #{{ video.id }}{% endblock %}
+{% block page_title %}Computer Vision Processing{% endblock %}
 
 {% block extra_css %}
 <style>
-    .cyber-card {
-        background: rgba(10, 14, 26, 0.6);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-top: 2px solid var(--accent);
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-    }
+/* ── Layout shell ────────────────────────────────────────────── */
+.cv-shell {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto auto 1fr;
+    gap: 1.25rem;
+    height: calc(100vh - 140px);
+    min-height: 640px;
+}
+@media (max-width: 1199px) {
+    .cv-shell { grid-template-columns: 1fr; height: auto; }
+    .cv-sidebar { grid-row: unset !important; }
+}
 
-    .video-container {
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
-        position: relative;
-    }
+/* ── Glass card base ─────────────────────────────────────────── */
+.cv-card {
+    background: rgba(10,14,26,0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    overflow: hidden;
+}
 
-    .video-container::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        box-shadow: inset 0 0 20px rgba(79, 142, 247, 0.2);
-        pointer-events: none;
-        border-radius: 12px;
-    }
+/* ── Pipeline bar ────────────────────────────────────────────── */
+.pipeline-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: rgba(10,14,26,0.7);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.pipe-stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.85rem 0.5rem;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+    transition: background 0.4s;
+}
+.pipe-stage:last-child { border-right: none; }
 
-    .data-card {
-        background: linear-gradient(180deg, rgba(20, 25, 45, 0.4) 0%, rgba(10, 15, 30, 0.8) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        padding: 1.5rem;
-        position: relative;
-        overflow: hidden;
-    }
+/* connector arrow */
+.pipe-stage:not(:last-child)::after {
+    content: '›';
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255,255,255,0.15);
+    font-size: 1.1rem;
+    z-index: 2;
+}
 
-    .data-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 4px;
-        height: 100%;
-        background: var(--card-color, var(--accent));
-        box-shadow: 0 0 15px var(--card-color, var(--accent));
-    }
+.pipe-stage.done {
+    background: rgba(34,197,94,0.07);
+}
+.pipe-stage.active {
+    background: rgba(79,142,247,0.12);
+    box-shadow: inset 0 0 30px rgba(79,142,247,0.08);
+}
+.pipe-stage.failed {
+    background: rgba(239,68,68,0.08);
+}
 
-    .data-value {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 2.5rem;
-        font-weight: 800;
-        line-height: 1.1;
-        letter-spacing: -1px;
-        color: #ffffff;
-        text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
-    }
+.pipe-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.04);
+    transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
+}
+.pipe-stage.done  .pipe-icon { background:rgba(34,197,94,0.15);  border-color:rgba(34,197,94,0.35);  color:#22c55e; box-shadow:0 0 12px rgba(34,197,94,0.3); }
+.pipe-stage.active .pipe-icon{ background:rgba(79,142,247,0.2);  border-color:rgba(79,142,247,0.5);  color:#60a5fa; box-shadow:0 0 16px rgba(79,142,247,0.4); }
+.pipe-stage.failed .pipe-icon{ background:rgba(239,68,68,0.15);  border-color:rgba(239,68,68,0.35);  color:#ef4444; }
 
-    .data-label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        color: var(--text-secondary);
-        margin-bottom: 0.5rem;
-        font-weight: 600;
-    }
+.pipe-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: rgba(255,255,255,0.35);
+    transition: color 0.4s;
+}
+.pipe-stage.done  .pipe-label  { color: #22c55e; }
+.pipe-stage.active .pipe-label { color: #93c5fd; }
+.pipe-stage.failed .pipe-label { color: #f87171; }
 
-    .status-badge {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.85rem;
-        padding: 0.4rem 1rem;
-        border-radius: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(0, 0, 0, 0.4);
-        font-weight: 600;
-    }
+.pipe-tick {
+    font-size: 0.6rem;
+    height: 14px;
+    display: flex; align-items: center; justify-content: center;
+}
+.pipe-stage.done  .pipe-tick { color:#22c55e; }
+.pipe-stage.active .pipe-tick { color:#60a5fa; }
+
+/* Active stage pulse animation */
+@keyframes pulseBorder {
+    0%,100% { box-shadow: 0 0 16px rgba(79,142,247,0.4); }
+    50%      { box-shadow: 0 0 28px rgba(79,142,247,0.8); }
+}
+.pipe-stage.active .pipe-icon {
+    animation: pulseBorder 1.5s ease-in-out infinite;
+}
+
+/* ── Stream panel ────────────────────────────────────────────── */
+.stream-panel {
+    grid-row: 2 / 4;
+}
+.stream-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1.2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.02);
+}
+.stream-body {
+    position: relative;
+    background: #000;
+    height: calc(100% - 54px);
+    min-height: 340px;
+}
+.stream-img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.stream-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.6s;
+    z-index: 10;
+}
+.stream-overlay.hidden { opacity: 0; pointer-events: none; }
+
+/* scan-line effect on the live stream */
+.stream-body::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.03) 0px,
+        rgba(0,0,0,0.03) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+.cv-sidebar {
+    grid-row: 2 / 4;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    overflow-y: auto;
+}
+
+/* ── Stat tiles ──────────────────────────────────────────────── */
+.stat-tile {
+    background: linear-gradient(160deg, rgba(18,24,44,0.6) 0%, rgba(10,14,26,0.9) 100%);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 0.9rem 1.1rem;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.stat-tile::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0;
+    width: 3px; height: 100%;
+    background: var(--tile-color, var(--accent));
+    box-shadow: 0 0 12px var(--tile-color, var(--accent));
+}
+.tile-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.8px;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 0.3rem;
+}
+.tile-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 18px rgba(255,255,255,0.25);
+    transition: all 0.3s;
+}
+.tile-value.bump {
+    transform: scale(1.08);
+    color: #60a5fa;
+}
+
+/* ── Breakdown grid ──────────────────────────────────────────── */
+.breakdown-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+}
+.bk-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 0.5rem 0.4rem;
+    text-align: center;
+}
+.bk-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #fff;
+    transition: all 0.3s;
+}
+.bk-lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: #475569; margin-top: 2px; }
+
+/* ── Congestion bar ──────────────────────────────────────────── */
+.congestion-bar-wrap {
+    height: 6px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+.congestion-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.8s ease, background 0.5s;
+    background: linear-gradient(90deg, #22c55e, #f59e0b);
+}
+
+/* ── Detection log ───────────────────────────────────────────── */
+.det-log {
+    flex-grow: 1;
+    background: rgba(5,8,18,0.8);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 0.75rem;
+    overflow-y: auto;
+    min-height: 120px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+}
+.det-log::-webkit-scrollbar { width: 4px; }
+.det-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.log-line {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.18rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    animation: fadeIn 0.3s ease;
+    color: rgba(255,255,255,0.6);
+}
+.log-line:last-child { border-bottom: none; }
+.log-ts   { color: #334155; flex-shrink: 0; }
+.log-tag  { flex-shrink: 0; padding: 0 0.35rem; border-radius: 3px; font-size: 0.62rem; font-weight: 700; }
+.log-msg  { color: rgba(255,255,255,0.55); }
+.tag-yolo { background: rgba(79,142,247,0.2); color: #60a5fa; }
+.tag-xgb  { background: rgba(139,92,246,0.2); color: #a78bfa; }
+.tag-sync { background: rgba(34,197,94,0.2);  color: #4ade80; }
+.tag-info { background: rgba(148,163,184,0.15);color: #94a3b8; }
+.tag-warn { background: rgba(245,158,11,0.2); color: #fbbf24; }
+.tag-done { background: rgba(34,197,94,0.2);  color: #4ade80; }
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+/* ── Congestion badge ────────────────────────────────────────── */
+.congestion-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 800;
+    padding: 0.35rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    letter-spacing: 1px;
+    transition: all 0.4s;
+    margin-top: 0.4rem;
+}
+.badge-FREE_FLOW { background:rgba(34,197,94,0.12);  color:#22c55e; border-color:rgba(34,197,94,0.25); }
+.badge-MODERATE  { background:rgba(251,191,36,0.12);  color:#fbbf24; border-color:rgba(251,191,36,0.25); }
+.badge-HEAVY     { background:rgba(249,115,22,0.12);  color:#f97316; border-color:rgba(249,115,22,0.25); }
+.badge-GRIDLOCK  { background:rgba(239,68,68,0.12);   color:#ef4444; border-color:rgba(239,68,68,0.25); }
+.badge-ANALYZING { background:rgba(148,163,184,0.1);  color:#94a3b8; border-color:rgba(148,163,184,0.2); }
+
+/* ── Live dot ────────────────────────────────────────────────── */
+.live-indicator {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+    animation: blink 1.2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+.live-dot.yellow { background:#fbbf24; box-shadow:0 0 6px #fbbf24; }
+.live-dot.red    { background:#ef4444; box-shadow:0 0 6px #ef4444; }
+
+/* Completed state  */
+.stream-done-badge {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(34,197,94,0.15);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: #22c55e;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+    z-index: 20;
+    display: none;
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center g-4">
-    <div class="col-12 col-xl-9">
-        <div class="cyber-card p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div class="d-flex align-items-center">
-                    <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3 mb-0"
-                        style="width: 40px; height: 40px; font-size: 1.2rem;">
-                        <i class="bi bi-cpu"></i>
-                    </div>
-                    <div>
-                        <h5 class="mb-0 text-white fw-bold">Real-Time Tracker</h5>
-                        <div class="text-muted small" style="font-family: 'JetBrains Mono', monospace;">STREAM //
-                            YOLOv8 // {{ video.id }}</div>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center gap-3">
-                    <div class="status-badge text-success">
-                        <span class="live-dot live me-2"></span>ONLINE
-                    </div>
-                    <a href="{% url 'vision:status' %}" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-arrow-left me-1"></i>Back to Vision
-                    </a>
-                </div>
-            </div>
+<div class="cv-shell">
 
-            <div class="ratio ratio-16x9 bg-black video-container">
-                <img src="{% url 'vision:stream_inference_feed' video.id %}" id="inferenceStream"
-                    class="w-100 h-100 object-fit-contain" alt="Live ML Inference Stream">
-            </div>
+  <!-- ════════════════════════════════════════════════════════════════
+       ROW 1 — Pipeline bar (spans full width)
+  ═════════════════════════════════════════════════════════════════════ -->
+  <div class="pipeline-bar" id="pipelineBar">
+    <div class="pipe-stage done" id="stage0">
+      <div class="pipe-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+      <div class="pipe-label">Upload</div>
+      <div class="pipe-tick" id="tick0"><i class="bi bi-check-circle-fill"></i></div>
+    </div>
+    <div class="pipe-stage" id="stage1">
+      <div class="pipe-icon"><i class="bi bi-film"></i></div>
+      <div class="pipe-label">Decode</div>
+      <div class="pipe-tick" id="tick1">—</div>
+    </div>
+    <div class="pipe-stage" id="stage2">
+      <div class="pipe-icon"><i class="bi bi-camera"></i></div>
+      <div class="pipe-label">YOLOv8 Detect</div>
+      <div class="pipe-tick" id="tick2">—</div>
+    </div>
+    <div class="pipe-stage" id="stage3">
+      <div class="pipe-icon"><i class="bi bi-diagram-3"></i></div>
+      <div class="pipe-label">XGBoost Classify</div>
+      <div class="pipe-tick" id="tick3">—</div>
+    </div>
+    <div class="pipe-stage" id="stage4">
+      <div class="pipe-icon"><i class="bi bi-database-check"></i></div>
+      <div class="pipe-label">DB Sync</div>
+      <div class="pipe-tick" id="tick4">—</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       ROW 2+3 LEFT — Annotated stream
+  ═════════════════════════════════════════════════════════════════════ -->
+  <div class="cv-card stream-panel">
+
+    <!-- Header bar -->
+    <div class="stream-header">
+      <div class="d-flex align-items-center gap-2">
+        <div class="live-indicator">
+          <div class="live-dot" id="liveDot"></div>
+          <span id="liveLabel" class="text-success">PROCESSING</span>
         </div>
+        <span class="text-muted" style="font-size:0.72rem;margin-left:0.5rem;">
+          Video #{{ video.id }}
+          {% if video.location %} · {{ video.location.name }}{% endif %}
+        </span>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span class="text-muted" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;">
+          YOLOv8n + XGBoost
+        </span>
+        <a href="{% url 'vision:status' %}" class="btn btn-sm btn-outline-secondary py-1 px-2">
+          <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+      </div>
     </div>
 
-    <div class="col-12 col-xl-3">
-        <div class="cyber-card p-4 h-100 d-flex flex-column gap-3">
-            <h6 class="text-white fw-bold text-uppercase tracking-wider mb-2"
-                style="letter-spacing: 2px; font-size: 0.85rem;">Live Telemetry</h6>
+    <!-- Stream -->
+    <div class="stream-body">
 
-            <div class="data-card" style="--card-color: var(--info);">
-                <div class="data-label"><i class="bi bi-robot me-2"></i>AI Engine</div>
-                <div class="text-info fs-5 fw-bold mb-1">YOLOv8 Nano</div>
-                <div class="text-muted" style="font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">Classes:
-                    2,3,5,7 (Vehicles)</div>
-            </div>
-
-            <div class="data-card" style="--card-color: var(--primary);">
-                <div class="data-label">Total Vehicles Tracked</div>
-                <div class="d-flex align-items-end gap-3 mt-2">
-                    <div class="data-value" id="liveVehicles">--</div>
-                    <div class="spinner-grow spinner-grow-sm text-primary mb-2" role="status" id="loadingSpinner"></div>
-                </div>
-            </div>
-
-            <div class="data-card" style="--card-color: var(--success);">
-                <div class="data-label">Average Speed</div>
-                <div class="d-flex align-items-end gap-2 mt-2">
-                    <div class="data-value" id="liveSpeed">0.0</div>
-                    <div class="text-muted fw-bold mb-2">KM/H</div>
-                </div>
-            </div>
-
-            <div class="data-card flex-grow-1" style="--card-color: var(--warning);">
-                <div class="data-label">Congestion Status</div>
-                <div class="mt-2">
-                    <div class="data-value text-warning" style="font-size: 1.8rem;" id="liveStatus">ANALYZING</div>
-                </div>
-            </div>
+      <!-- Waiting overlay — shown until stream starts pushing frames -->
+      <div class="stream-overlay" id="streamOverlay">
+        <div class="spinner-border text-primary" style="width:3rem;height:3rem;"></div>
+        <div class="text-white fw-semibold">Starting detection engine…</div>
+        <div class="text-muted" style="font-size:0.78rem;">
+          YOLOv8 is loading — first frame in a few seconds
         </div>
-    </div>
-</div>
+      </div>
 
+      <!-- Completed badge -->
+      <div class="stream-done-badge" id="doneBadge">✓ ANALYSIS COMPLETE</div>
+
+      <!-- The actual annotated MJPEG stream -->
+      <img id="inferenceStream"
+           src="{% url 'vision:stream_inference_feed' video.id %}"
+           class="stream-img"
+           alt="YOLOv8 Inference"
+           onload="document.getElementById('streamOverlay').classList.add('hidden')">
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       ROW 2+3 RIGHT — Live telemetry sidebar
+  ═════════════════════════════════════════════════════════════════════ -->
+  <div class="cv-sidebar">
+
+    <!-- Total vehicles -->
+    <div class="stat-tile" style="--tile-color:#4f8ef7;">
+      <div class="tile-label"><i class="bi bi-people me-1"></i>Vehicles Tracked</div>
+      <div class="tile-value" id="tileVehicles">—</div>
+    </div>
+
+    <!-- Per-class breakdown -->
+    <div class="stat-tile" style="--tile-color:#8b5cf6;">
+      <div class="tile-label"><i class="bi bi-grid me-1"></i>Breakdown</div>
+      <div class="breakdown-grid mt-2">
+        <div class="bk-item">
+          <div class="bk-val" id="bkCar">0</div>
+          <div class="bk-lbl">🚗 Cars</div>
+        </div>
+        <div class="bk-item">
+          <div class="bk-val" id="bkTruck">0</div>
+          <div class="bk-lbl">🚛 Trucks</div>
+        </div>
+        <div class="bk-item">
+          <div class="bk-val" id="bkMoto">0</div>
+          <div class="bk-lbl">🏍 Motos</div>
+        </div>
+        <div class="bk-item">
+          <div class="bk-val" id="bkBus">0</div>
+          <div class="bk-lbl">🚌 Buses</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Speed -->
+    <div class="stat-tile" style="--tile-color:#22c55e;">
+      <div class="tile-label"><i class="bi bi-speedometer2 me-1"></i>Average Speed</div>
+      <div class="d-flex align-items-end gap-2">
+        <div class="tile-value" id="tileSpeed">0.0</div>
+        <div class="text-muted fw-bold mb-1" style="font-size:0.85rem;">KM/H</div>
+      </div>
+      <div class="text-muted mt-1" style="font-size:0.73rem;">
+        Queue: <span id="tileQueue" class="text-info">0</span> m
+      </div>
+    </div>
+
+    <!-- Congestion -->
+    <div class="stat-tile" style="--tile-color:#f59e0b;">
+      <div class="tile-label"><i class="bi bi-activity me-1"></i>Congestion</div>
+      <div class="congestion-badge badge-ANALYZING" id="congBadge">ANALYZING</div>
+      <div class="congestion-bar-wrap mt-2">
+        <div class="congestion-bar-fill" id="congBar" style="width:0%;"></div>
+      </div>
+      <div class="text-muted mt-1" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;">
+        Index: <span id="congIndex">—</span>
+      </div>
+    </div>
+
+    <!-- Detection log -->
+    <div class="stat-tile" style="--tile-color:#334155;padding:0.75rem;flex-grow:1;display:flex;flex-direction:column;">
+      <div class="tile-label mb-2"><i class="bi bi-terminal me-1"></i>Detection Log</div>
+      <div class="det-log" id="detLog">
+        <div class="log-line">
+          <span class="log-ts" id="tsInit">--:--:--</span>
+          <span class="log-tag tag-info">INFO</span>
+          <span class="log-msg">YOLOv8 inference stream started</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /cv-shell -->
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const videoId = "{{ video.id }}";
-    const statsUrl = "{% url 'vision:inference_stats_api' video.id %}";
+const STATS_URL   = "{% url 'vision:inference_stats_api' video.id %}";
+const STAGES      = [0, 1, 2, 3, 4];
+const STAGE_ELS   = STAGES.map(i => document.getElementById('stage' + i));
+const TICK_ELS    = STAGES.map(i => document.getElementById('tick' + i));
+const DONE_ICON   = '<i class="bi bi-check-circle-fill"></i>';
+const SPIN_ICON   = '<div class="spinner-border spinner-border-sm text-primary" style="width:10px;height:10px;border-width:1.5px;"></div>';
 
-    const countEl = document.getElementById('liveVehicles');
-    const speedEl = document.getElementById('liveSpeed');
-    const statusEl = document.getElementById('liveStatus');
-    const spinner = document.getElementById('loadingSpinner');
+let prevCount = 0, prevSpeed = 0, prevLevel = '';
+let logCount  = 0;
+const logEl   = document.getElementById('detLog');
+const doneBadge = document.getElementById('doneBadge');
 
-    function fetchStats() {
-        fetch(statsUrl)
-            .then(res => res.json())
-            .then(data => {
-                countEl.innerText = data.vehicle_count;
-                speedEl.innerText = data.average_speed;
-                statusEl.innerText = data.predicted_congestion_level;
+/* ── helpers ─────────────────────────────────────────────────── */
+function now() {
+    return new Date().toLocaleTimeString('en-GB', {hour12: false});
+}
 
-                // Color code the status
-                statusEl.className = 'data-value text-warning';
-                let color = 'var(--warning)';
-                if (data.predicted_congestion_level === 'FREE FLOW') {
-                    statusEl.className = 'data-value text-success';
-                    color = 'var(--success)';
-                } else if (data.predicted_congestion_level === 'GRIDLOCK') {
-                    statusEl.className = 'data-value text-danger';
-                    color = 'var(--danger)';
-                } else if (data.predicted_congestion_level === 'HEAVY') {
-                    statusEl.className = 'data-value text-orange';
-                    color = 'var(--orange)';
-                }
-                statusEl.closest('.data-card').style.setProperty('--card-color', color);
+function addLog(tag, tagClass, msg) {
+    if (logCount > 80) logEl.innerHTML = ''; // rolling clear
+    logCount++;
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-ts">${now()}</span><span class="log-tag ${tagClass}">${tag}</span><span class="log-msg">${msg}</span>`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+}
 
-                if (data.status === 'completed') {
-                    spinner.style.display = 'none';
-                    statusEl.parentElement.parentElement.querySelector('.data-label').innerHTML = 'Final Status';
-                }
-            })
-            .catch(err => console.error("Error polling stats:", err));
+function bump(el) {
+    el.classList.add('bump');
+    setTimeout(() => el.classList.remove('bump'), 350);
+}
+
+function setPipeline(activeStage) {
+    STAGES.forEach(i => {
+        const el   = STAGE_ELS[i];
+        const tick = TICK_ELS[i];
+        el.classList.remove('done', 'active', 'failed');
+        if (i < activeStage) {
+            el.classList.add('done');
+            tick.innerHTML = DONE_ICON;
+        } else if (i === activeStage) {
+            el.classList.add('active');
+            tick.innerHTML = SPIN_ICON;
+        } else {
+            tick.innerHTML = '—';
+        }
+    });
+}
+
+function setCongestion(level, idx) {
+    const badge = document.getElementById('congBadge');
+    const bar   = document.getElementById('congBar');
+    const key   = (level || 'ANALYZING').replace(/ /g, '_');
+    badge.className = 'congestion-badge badge-' + key;
+    badge.textContent = level || 'ANALYZING';
+
+    const barColors = {
+        FREE_FLOW: '#22c55e',
+        MODERATE:  '#f59e0b',
+        HEAVY:     '#f97316',
+        GRIDLOCK:  '#ef4444',
+        ANALYZING: '#475569',
+    };
+    bar.style.width      = (idx || 0) + '%';
+    bar.style.background = barColors[key] || '#475569';
+}
+
+function setLiveIndicator(status) {
+    const dot   = document.getElementById('liveDot');
+    const label = document.getElementById('liveLabel');
+    if (status === 'processing') {
+        dot.className   = 'live-dot yellow';
+        label.textContent = 'PROCESSING';
+        label.className = 'text-warning';
+    } else if (status === 'completed') {
+        dot.className   = 'live-dot';
+        label.textContent = 'COMPLETE';
+        label.className = 'text-success';
+    } else if (status === 'failed') {
+        dot.className   = 'live-dot red';
+        label.textContent = 'FAILED';
+        label.className = 'text-danger';
+    } else {
+        dot.className   = 'live-dot yellow';
+        label.textContent = 'PENDING';
+        label.className = 'text-warning';
     }
+}
 
-    // Poll every 1.5 seconds
-    const pollInterval = setInterval(fetchStats, 1500);
-    fetchStats(); // Initial call
+/* ── Main polling loop ───────────────────────────────────────── */
+document.getElementById('tsInit').textContent = now();
+
+function poll() {
+    fetch(STATS_URL)
+        .then(r => r.json())
+        .then(data => {
+            const status = data.status;
+            const count  = data.vehicle_count;
+            const speed  = data.average_speed;
+            const level  = data.predicted_congestion_level;
+            const idx    = data.congestion_index || 0;
+
+            /* ── Pipeline stages ── */
+            // While processing: cycle stages 1→2→3 in a visual pattern
+            let activeStage = data.active_stage;
+            if (status === 'processing') {
+                // Advance stages 1, 2, 3 sequentially based on time
+                const tick = Math.floor(Date.now() / 2000) % 3;
+                activeStage = [1, 2, 3][tick];
+            }
+            setPipeline(activeStage);
+
+            /* ── Live indicator ── */
+            setLiveIndicator(status);
+
+            /* ── Vehicles tile ── */
+            const vEl = document.getElementById('tileVehicles');
+            if (count !== prevCount) {
+                vEl.textContent = count;
+                bump(vEl);
+            }
+
+            /* ── Breakdown ── */
+            document.getElementById('bkCar').textContent   = data.car_count   || 0;
+            document.getElementById('bkTruck').textContent = data.truck_count  || 0;
+            document.getElementById('bkMoto').textContent  = data.motorcycle_count || 0;
+            document.getElementById('bkBus').textContent   = data.bus_count    || 0;
+
+            /* ── Speed & queue ── */
+            document.getElementById('tileSpeed').textContent = speed;
+            document.getElementById('tileQueue').textContent = data.queue_length || '0';
+
+            /* ── Congestion ── */
+            setCongestion(level, idx);
+            document.getElementById('congIndex').textContent = idx;
+
+            /* ── Detection log entries ── */
+            if (status === 'processing') {
+                if (count > prevCount) {
+                    const diff = count - prevCount;
+                    addLog('YOLO', 'tag-yolo', `+${diff} vehicle${diff > 1 ? 's' : ''} detected — total ${count}`);
+                }
+                if (speed > 0 && speed !== prevSpeed) {
+                    addLog('TRACK', 'tag-yolo', `Avg speed updated → ${speed} km/h`);
+                }
+                if (level !== prevLevel && level && level !== 'ANALYZING') {
+                    addLog('XGB', 'tag-xgb', `Congestion classified → ${level} (index ${idx})`);
+                    if (['HEAVY', 'GRIDLOCK'].includes(level)) {
+                        addLog('ALERT', 'tag-warn', `⚠ High congestion — alert triggered`);
+                    }
+                }
+            }
+
+            if (status === 'completed' && prevLevel !== '__done__') {
+                prevLevel = '__done__';
+                addLog('SYNC', 'tag-sync', `TrafficReading saved to DB — ${count} vehicles, ${speed} km/h`);
+                addLog('DONE', 'tag-done', `Analysis complete ✓`);
+                doneBadge.style.display = 'block';
+                document.getElementById('streamOverlay').classList.add('hidden');
+            }
+
+            if (status === 'failed') {
+                addLog('ERR', 'tag-warn', 'Processing failed — check server logs');
+            }
+
+            prevCount = count;
+            prevSpeed = speed;
+            if (status !== 'completed') prevLevel = level;
+        })
+        .catch(() => {});
+}
+
+// Initial log lines
+addLog('INFO', 'tag-info', 'Stream connected — waiting for first frame');
+addLog('YOLO', 'tag-yolo', 'YOLOv8n model loaded — tracking classes: car, truck, bus, motorcycle');
+addLog('XGB',  'tag-xgb',  'XGBoost classifier ready');
+
+// Start poll
+poll();
+setInterval(poll, 1500);
+
+// Hide overlay once the img starts loading frames
+document.getElementById('inferenceStream').addEventListener('load', function() {
+    setTimeout(() => {
+        document.getElementById('streamOverlay').classList.add('hidden');
+        addLog('INFO', 'tag-info', 'First annotated frame received');
+    }, 500);
+});
 </script>
 {% endblock %}

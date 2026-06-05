@@ -143,4 +143,6 @@ OPENWEATHER_API_KEY = env('OPENWEATHER_API_KEY', default='')
 # ── ML Model Paths ────────────────────────────────────────────────
 LSTM_MODEL_PATH   = BASE_DIR / env('LSTM_MODEL_PATH',   default='ml/saved_models/lstm_best.onnx')
 XGB_MODEL_PATH    = BASE_DIR / env('XGB_MODEL_PATH',    default='ml/saved_models/xgb_classifier.pkl')
+XGB_SCALER_PATH   = BASE_DIR / env('XGB_SCALER_PATH',   default='ml/saved_models/xgb_scaler.pkl')
+LSTM_SCALER_PATH  = BASE_DIR / env('LSTM_SCALER_PATH',  default='ml/saved_models/scaler.pkl')
 YOLO_WEIGHTS_PATH = BASE_DIR / env('YOLO_WEIGHTS_PATH', default='ml/saved_models/yolov8n.pt')

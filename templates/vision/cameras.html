@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Cameras{% endblock %}
+{% block page_title %}Camera Management{% endblock %}
+
+{% block extra_css %}
+<style>
+.cam-card {
+    background: linear-gradient(145deg, rgba(15,22,40,0.9), rgba(10,14,26,0.9));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    transition: border-color .2s, box-shadow .2s;
+}
+.cam-card:hover {
+    border-color: rgba(79,142,247,0.35);
+    box-shadow: 0 4px 24px rgba(79,142,247,0.12);
+}
+.cam-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+}
+.badge-rtsp  { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+.badge-http  { background: rgba(34,197,94,0.15);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+.badge-file  { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+.badge-none  { background: rgba(100,116,139,0.15);color: #64748b; border: 1px solid rgba(100,116,139,0.3); }
+.badge-active   { background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.25); }
+.badge-inactive { background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h5 class="text-white fw-bold mb-1">Registered Cameras</h5>
+    <div class="text-muted small">Manage RTSP, HTTP, and file-based video sources for live analysis</div>
+  </div>
+  <a href="{% url 'vision:camera_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-2"></i>Add Camera
+  </a>
+</div>
+
+{% if cameras %}
+<div class="row g-3">
+  {% for cam in cameras %}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="cam-card p-4 h-100 d-flex flex-column">
+
+      <!-- Header -->
+      <div class="d-flex align-items-start justify-content-between mb-3">
+        <div>
+          <div class="text-white fw-bold fs-6">{{ cam.name }}</div>
+          <div class="text-muted small mt-1">
+            <i class="bi bi-geo-alt me-1"></i>{{ cam.location.name }}
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <span class="cam-badge badge-{{ cam.stream_type }}">{{ cam.stream_type|upper }}</span>
+          {% if cam.is_active %}
+            <span class="cam-badge badge-active">Active</span>
+          {% else %}
+            <span class="cam-badge badge-inactive">Inactive</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Stream URL -->
+      {% if cam.stream_url %}
+      <div class="text-muted mb-3"
+           style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;
+                  word-break:break-all;background:rgba(255,255,255,0.04);
+                  padding:0.5rem 0.75rem;border-radius:6px;">
+        {{ cam.stream_url }}
+      </div>
+      {% endif %}
+
+      <!-- Actions -->
+      <div class="mt-auto d-flex gap-2 flex-wrap">
+        {% if cam.is_active and cam.stream_url %}
+        <a href="{% url 'vision:camera_live' cam.id %}"
+           class="btn btn-sm btn-primary">
+          <i class="bi bi-play-circle me-1"></i>Live View
+        </a>
+        {% endif %}
+        <a href="{% url 'vision:camera_edit' cam.id %}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <form method="post" action="{% url 'vision:camera_delete' cam.id %}"
+              onsubmit="return confirm('Delete camera {{ cam.name }}?')">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-danger" type="submit">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center text-muted py-5"
+     style="background:rgba(15,22,40,0.6);border-radius:16px;border:1px dashed rgba(255,255,255,0.1);">
+  <i class="bi bi-camera-video-off fs-1 d-block mb-3"></i>
+  <div class="fw-semibold mb-1">No cameras registered</div>
+  <div class="small mb-4">Add an RTSP camera, HTTP stream, or local video file as a source</div>
+  <a href="{% url 'vision:camera_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-circle me-2"></i>Add First Camera
+  </a>
+</div>
+{% endif %}
+
+<div class="mt-4">
+  <a href="{% url 'vision:status' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to Vision
+  </a>
+</div>
+
+{% endblock %}

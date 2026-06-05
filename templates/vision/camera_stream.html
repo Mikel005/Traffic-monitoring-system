@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}{{ camera.name }} — Live{% endblock %}
+{% block page_title %}Live Camera Feed{% endblock %}
+
+{% block extra_css %}
+<style>
+.cyber-card {
+    background: rgba(10,14,26,0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-top: 2px solid var(--accent);
+    border-radius: 16px;
+}
+.video-container {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+    position: relative;
+}
+.video-container::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    box-shadow:inset 0 0 20px rgba(79,142,247,0.2);
+    pointer-events:none;
+    border-radius:12px;
+}
+.data-card {
+    background: linear-gradient(180deg,rgba(20,25,45,0.4) 0%,rgba(10,15,30,0.8) 100%);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 1.1rem 1.4rem;
+    position: relative;
+    overflow: hidden;
+}
+.data-card::before {
+    content:'';
+    position:absolute;
+    top:0;left:0;
+    width:4px;height:100%;
+    background:var(--card-color,var(--accent));
+    box-shadow:0 0 15px var(--card-color,var(--accent));
+}
+.data-value {
+    font-family:'JetBrains Mono',monospace;
+    font-size:2rem;
+    font-weight:800;
+    color:#fff;
+    text-shadow:0 0 20px rgba(255,255,255,0.3);
+}
+.data-label {
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    color:var(--text-secondary);
+    margin-bottom:0.35rem;
+    font-weight:600;
+}
+.breakdown-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0.45rem;
+    margin-top:0.5rem;
+}
+.breakdown-item {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    background:rgba(255,255,255,0.04);
+    border-radius:8px;
+    padding:0.45rem;
+}
+.breakdown-val {
+    font-family:'JetBrains Mono',monospace;
+    font-size:1.3rem;
+    font-weight:700;
+    color:#fff;
+}
+.breakdown-lbl {
+    font-size:0.62rem;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:#64748b;
+    margin-top:2px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center g-4">
+
+  <!-- Stream panel -->
+  <div class="col-12 col-xl-8">
+    <div class="cyber-card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-success bg-opacity-10 text-success mb-0"
+               style="width:40px;height:40px;font-size:1.2rem;">
+            <i class="bi bi-camera-video"></i>
+          </div>
+          <div>
+            <h5 class="mb-0 text-white fw-bold">{{ camera.name }}</h5>
+            <div class="text-muted small" style="font-family:'JetBrains Mono',monospace;">
+              {{ camera.location.name }} &nbsp;·&nbsp; {{ camera.stream_type|upper }}
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3">
+            ● LIVE
+          </span>
+          <a href="{% url 'vision:cameras' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Cameras
+          </a>
+        </div>
+      </div>
+
+      <div class="ratio ratio-16x9 bg-black video-container">
+        <img src="{% url 'vision:camera_feed' camera.id %}"
+             class="w-100 h-100 object-fit-contain"
+             alt="Live Camera Feed — {{ camera.name }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- Telemetry sidebar -->
+  <div class="col-12 col-xl-4">
+    <div class="cyber-card p-4 h-100 d-flex flex-column gap-3">
+
+      <h6 class="text-white fw-bold text-uppercase mb-1"
+          style="letter-spacing:2px;font-size:0.82rem;">
+        Live Detection
+      </h6>
+
+      <div class="data-card" style="--card-color:var(--info);">
+        <div class="data-label"><i class="bi bi-robot me-1"></i>AI Pipeline</div>
+        <div class="text-info fw-bold">YOLOv8 + XGBoost</div>
+        <div class="text-muted mt-1" style="font-size:0.75rem;font-family:'JetBrains Mono',monospace;">
+          Real-time detection &amp; classification
+        </div>
+      </div>
+
+      <div class="data-card" style="--card-color:var(--primary);">
+        <div class="data-label">Vehicles on Screen</div>
+        <div class="data-value" id="liveVehicles">—</div>
+      </div>
+
+      <div class="data-card" style="--card-color:#8b5cf6;">
+        <div class="data-label"><i class="bi bi-grid me-1"></i>Breakdown</div>
+        <div class="breakdown-grid">
+          <div class="breakdown-item">
+            <div class="breakdown-val" id="carCount">0</div>
+            <div class="breakdown-lbl"><i class="bi bi-car-front"></i> Cars</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="breakdown-val" id="truckCount">0</div>
+            <div class="breakdown-lbl"><i class="bi bi-truck"></i> Trucks</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="breakdown-val" id="motoCount">0</div>
+            <div class="breakdown-lbl"><i class="bi bi-bicycle"></i> Motos</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="breakdown-val" id="busCount">0</div>
+            <div class="breakdown-lbl"><i class="bi bi-bus-front"></i> Buses</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="data-card" style="--card-color:var(--success);">
+        <div class="data-label">Avg Speed</div>
+        <div class="d-flex align-items-end gap-2">
+          <div class="data-value" id="liveSpeed">0.0</div>
+          <div class="text-muted fw-bold mb-1">KM/H</div>
+        </div>
+        <div class="text-muted mt-1" style="font-size:0.75rem;">
+          Queue: <span id="queueLength" class="text-info">0</span> m
+        </div>
+      </div>
+
+      <div class="data-card flex-grow-1" style="--card-color:var(--warning);">
+        <div class="data-label">Congestion</div>
+        <div class="data-value text-warning" style="font-size:1.5rem;" id="liveStatus">
+          ANALYZING
+        </div>
+      </div>
+
+      <!-- Camera info -->
+      <div class="mt-1 p-3"
+           style="background:rgba(255,255,255,0.03);border-radius:8px;
+                  border:1px solid rgba(255,255,255,0.05);font-size:0.78rem;">
+        <div class="text-muted mb-1">Source</div>
+        <div class="text-white"
+             style="font-family:'JetBrains Mono',monospace;word-break:break-all;">
+          {{ camera.stream_url|default:"—" }}
+        </div>
+        <div class="d-flex gap-3 mt-2 text-muted">
+          <span><i class="bi bi-geo-alt me-1"></i>{{ camera.location.name }}</span>
+          <span class="ms-auto">
+            <a href="{% url 'vision:camera_edit' camera.id %}"
+               class="text-muted text-decoration-none">
+              <i class="bi bi-pencil me-1"></i>Edit
+            </a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Camera live feed has no stats DB row — the sidebar shows values
+   embedded in the MJPEG frame HUD. For future: expose a camera stats
+   API endpoint per camera if a DB proxy row is added. */
+</script>
+{% endblock %}

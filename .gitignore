@@ -26,6 +26,10 @@ ml/saved_models/*.onnx
 ml/saved_models/*.pkl
 vision/weights/*.pt
 *.pt
+*.torchscript
+
+# Claude Code
+.claude/
 
 # Docker volumes
 postgres_data/

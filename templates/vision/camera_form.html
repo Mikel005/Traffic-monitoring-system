@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card p-4"
+         style="background:linear-gradient(145deg,rgba(15,22,40,0.9),rgba(10,14,26,0.9));
+                border-left:4px solid var(--accent);">
+
+      <h6 class="text-white fw-bold fs-5 mb-4">
+        <i class="bi bi-camera-video me-2 text-primary"></i>{{ title }}
+      </h6>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label text-muted small fw-semibold text-uppercase"
+                 style="letter-spacing:1px;">Camera Name</label>
+          {{ form.name }}
+          {% if form.name.errors %}
+            <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-muted small fw-semibold text-uppercase"
+                 style="letter-spacing:1px;">Location</label>
+          {{ form.location }}
+          {% if form.location.errors %}
+            <div class="text-danger small mt-1">{{ form.location.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-muted small fw-semibold text-uppercase"
+                 style="letter-spacing:1px;">Stream Source</label>
+          {{ form.stream_url }}
+          <div class="text-muted mt-1" style="font-size:0.78rem;">
+            {{ form.stream_url.help_text }}
+          </div>
+          {% if form.stream_url.errors %}
+            <div class="text-danger small mt-1">{{ form.stream_url.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Stream type helper -->
+        <div class="mb-4 p-3" style="background:rgba(255,255,255,0.03);border-radius:8px;
+                                      border:1px solid rgba(255,255,255,0.06);">
+          <div class="text-muted small fw-semibold mb-2">Supported Sources</div>
+          <div class="d-flex flex-wrap gap-3" style="font-size:0.8rem;">
+            <span><code class="text-purple">rtsp://192.168.1.100:554/stream</code>
+              <span class="text-muted ms-1">— IP Camera</span></span>
+            <span><code class="text-info">http://host/video.mjpg</code>
+              <span class="text-muted ms-1">— HTTP stream</span></span>
+            <span><code class="text-warning">/media/videos/clip.mp4</code>
+              <span class="text-muted ms-1">— Local file</span></span>
+            <span><code class="text-success">0</code>
+              <span class="text-muted ms-1">— Webcam index</span></span>
+          </div>
+        </div>
+
+        <div class="mb-4 d-flex align-items-center gap-2">
+          {{ form.is_active }}
+          <label class="form-check-label text-white">Active</label>
+        </div>
+
+        <div class="d-flex gap-3">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-circle me-2"></i>Save Camera
+          </button>
+          <a href="{% url 'vision:cameras' %}" class="btn btn-outline-secondary">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -9,6 +9,9 @@ from django.conf import settings
 _lstm_session = None
 _xgb_model    = None
 _xgb_scaler   = None
+_lstm_scaler  = None
+
+CONGESTION_LABELS = {0: 'Free Flow', 1: 'Moderate', 2: 'Heavy', 3: 'Gridlock'}
 
 
 def _load_lstm():
@@ -29,13 +32,23 @@ def _load_xgb():
         try:
             import joblib
             _xgb_model  = joblib.load(str(settings.XGB_MODEL_PATH))
-            scaler_path = str(settings.XGB_MODEL_PATH).replace(
-                'xgb_classifier.pkl', 'xgb_scaler.pkl')
-            _xgb_scaler = joblib.load(scaler_path)
+            _xgb_scaler = joblib.load(str(settings.XGB_SCALER_PATH))
             logger.info("✅ XGBoost model loaded")
         except Exception as e:
             logger.warning(f"⚠️  XGBoost not found ({e})")
     return _xgb_model, _xgb_scaler
+
+
+def _load_lstm_scaler():
+    global _lstm_scaler
+    if _lstm_scaler is None:
+        try:
+            import joblib
+            _lstm_scaler = joblib.load(str(settings.LSTM_SCALER_PATH))
+            logger.info("✅ LSTM scaler loaded")
+        except Exception as e:
+            logger.warning(f"⚠️  LSTM scaler not found ({e})")
+    return _lstm_scaler
 
 
 def _rule_based(current_index: float) -> dict:
@@ -76,3 +89,41 @@ def predict(feature_sequence: np.ndarray, current_index: float) -> dict:
     except Exception as e:
         logger.error(f"LSTM inference error: {e}")
         return _rule_based(current_index)
+
+
+def classify(features: np.ndarray) -> dict:
+    """
+    Run XGBoost congestion classification.
+    Args:
+        features: shape (1, n_features) — same feature vector as training
+    Returns:
+        dict with label (int 0-3), label_name, probabilities
+    """
+    model, scaler = _load_xgb()
+    if model is None:
+        return {'label': None, 'label_name': 'Unknown', 'probabilities': None}
+    try:
+        scaled = scaler.transform(features)
+        label  = int(model.predict(scaled)[0])
+        proba  = model.predict_proba(scaled)[0].tolist() if hasattr(model, 'predict_proba') else None
+        return {
+            'label':        label,
+            'label_name':   CONGESTION_LABELS.get(label, 'Unknown'),
+            'probabilities': proba,
+        }
+    except Exception as e:
+        logger.error(f"XGBoost inference error: {e}")
+        return {'label': None, 'label_name': 'Unknown', 'probabilities': None}
+
+
+def reload_models():
+    """Force reload all models (call after replacing model files)."""
+    global _lstm_session, _xgb_model, _xgb_scaler, _lstm_scaler
+    _lstm_session = None
+    _xgb_model    = None
+    _xgb_scaler   = None
+    _lstm_scaler  = None
+    _load_lstm()
+    _load_xgb()
+    _load_lstm_scaler()
+    logger.info("✅ All models reloaded")

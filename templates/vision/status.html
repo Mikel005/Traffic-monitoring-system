@@ -4,54 +4,71 @@
 
 {% block extra_css %}
 <style>
-  .status-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 0.3rem 0.7rem;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  .badge-processing { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
-  .badge-completed  { background: rgba(34,197,94,0.15);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
-  .badge-failed     { background: rgba(239,68,68,0.15);  color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
-  .badge-pending    { background: rgba(148,163,184,0.15);color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
-
-  .level-free     { color: #22c55e; }
-  .level-moderate { color: #f59e0b; }
-  .level-heavy    { color: #f97316; }
-  .level-gridlock { color: #ef4444; }
-
-  .feed-row {
-    display: flex;
-    align-items: center;
-    padding: 0.65rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    gap: 1rem;
-    font-size: 0.85rem;
-  }
-  .feed-row:last-child { border-bottom: none; }
-  .feed-location { color: #e2e8f0; font-weight: 600; min-width: 140px; }
-  .feed-meta     { color: #64748b; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
-
-  .pulse-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #22c55e;
-    box-shadow: 0 0 6px #22c55e;
-    animation: pulse 2s infinite;
-    flex-shrink: 0;
-  }
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0.3; }
-  }
+.status-badge {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.72rem;
+    font-weight:700;
+    padding:0.25rem 0.65rem;
+    border-radius:4px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+}
+.badge-processing { background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); }
+.badge-completed  { background:rgba(34,197,94,0.15);  color:#22c55e; border:1px solid rgba(34,197,94,0.3); }
+.badge-failed     { background:rgba(239,68,68,0.15);  color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
+.badge-pending    { background:rgba(148,163,184,0.15);color:#94a3b8; border:1px solid rgba(148,163,184,0.3); }
+.level-free     { color:#22c55e; }
+.level-moderate { color:#f59e0b; }
+.level-heavy    { color:#f97316; }
+.level-gridlock { color:#ef4444; }
+.feed-row {
+    display:flex;
+    align-items:flex-start;
+    padding:0.65rem 0;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+    gap:1rem;
+    font-size:0.82rem;
+}
+.feed-row:last-child { border-bottom:none; }
+.feed-location { color:#e2e8f0; font-weight:600; }
+.feed-meta     { color:#64748b; font-size:0.72rem; font-family:'JetBrains Mono',monospace; }
+.pulse-dot {
+    width:8px;height:8px;border-radius:50%;
+    background:#22c55e;
+    box-shadow:0 0 6px #22c55e;
+    animation:pulse 2s infinite;
+    flex-shrink:0;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.cam-pill {
+    display:inline-flex;align-items:center;gap:0.4rem;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:8px;
+    padding:0.55rem 1rem;
+    font-size:0.82rem;
+    color:#e2e8f0;
+    text-decoration:none;
+    transition:border-color .15s,background .15s;
+}
+.cam-pill:hover {
+    border-color:rgba(79,142,247,0.4);
+    background:rgba(79,142,247,0.07);
+    color:#fff;
+}
+.breakdown-mini {
+    display:inline-flex;gap:0.75rem;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.7rem;
+    color:#64748b;
+}
+.breakdown-mini span { color:#94a3b8; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- ── Summary stat cards ─────────────────────────────────────────── -->
+<!-- ── KPI cards ───────────────────────────────────────────────────── -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="kpi-card">
@@ -62,29 +79,70 @@
   <div class="col-6 col-md-3">
     <div class="kpi-card">
       <div class="kpi-label">Processing</div>
-      <div class="kpi-value" style="color: #fbbf24;">{{ stats.processing }}</div>
+      <div class="kpi-value" style="color:#fbbf24;">{{ stats.processing }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="kpi-card">
       <div class="kpi-label">Completed</div>
-      <div class="kpi-value" style="color: #22c55e;">{{ stats.completed }}</div>
+      <div class="kpi-value" style="color:#22c55e;">{{ stats.completed }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="kpi-card">
-      <div class="kpi-label">Failed</div>
-      <div class="kpi-value" style="color: #ef4444;">{{ stats.failed }}</div>
+      <div class="kpi-label">Cameras</div>
+      <div class="kpi-value" style="color:#818cf8;">{{ cameras|length }}</div>
     </div>
   </div>
 </div>
 
+<!-- ── Active cameras ─────────────────────────────────────────────── -->
+{% if cameras %}
+<div class="mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="text-white fw-bold mb-0">
+      <i class="bi bi-camera-video me-2 text-success"></i>Live Cameras
+    </h6>
+    {% if user.is_admin %}
+    <a href="{% url 'vision:cameras' %}" class="btn btn-sm btn-outline-secondary">
+      Manage <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+    {% endif %}
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% for cam in cameras %}
+      {% if cam.is_active and cam.stream_url %}
+      <a href="{% url 'vision:camera_live' cam.id %}" class="cam-pill">
+        <i class="bi bi-circle-fill text-success" style="font-size:0.55rem;"></i>
+        <span>{{ cam.name }}</span>
+        <span class="text-muted small">{{ cam.location.name }}</span>
+        <i class="bi bi-play-circle text-primary"></i>
+      </a>
+      {% else %}
+      <span class="cam-pill" style="opacity:0.5;cursor:default;">
+        <i class="bi bi-circle-fill text-secondary" style="font-size:0.55rem;"></i>
+        <span>{{ cam.name }}</span>
+        <span class="text-muted small">inactive</span>
+      </span>
+      {% endif %}
+    {% endfor %}
+    {% if user.is_admin %}
+    <a href="{% url 'vision:camera_create' %}" class="cam-pill" style="border-style:dashed;color:#64748b;">
+      <i class="bi bi-plus-circle"></i> Add Camera
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 <!-- ── Main content ───────────────────────────────────────────────── -->
 <div class="row g-4">
 
-  <!-- Uploaded videos table -->
+  <!-- Videos table -->
   <div class="col-12 col-xl-7">
-    <div class="card p-4" style="background: linear-gradient(145deg, rgba(15,22,40,0.9), rgba(10,14,26,0.9)); border-left: 4px solid var(--accent);">
+    <div class="card p-4"
+         style="background:linear-gradient(145deg,rgba(15,22,40,0.9),rgba(10,14,26,0.9));
+                border-left:4px solid var(--accent);">
 
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h6 class="fw-bold text-white fs-5 mb-0">
@@ -99,50 +157,56 @@
 
       {% if videos %}
       <div class="table-responsive">
-        <table class="table table-dark table-hover mb-0" style="font-size: 0.85rem;">
+        <table class="table table-dark table-hover mb-0" style="font-size:0.82rem;">
           <thead>
-            <tr style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">
+            <tr style="color:#64748b;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;">
               <th class="border-0 pb-3">Status</th>
               <th class="border-0 pb-3">Location</th>
               <th class="border-0 pb-3">Vehicles</th>
-              <th class="border-0 pb-3">Avg Speed</th>
-              <th class="border-0 pb-3">Congestion</th>
-              <th class="border-0 pb-3">Uploaded</th>
-              <th class="border-0 pb-3">Watch</th>
+              <th class="border-0 pb-3">Speed</th>
+              <th class="border-0 pb-3">Level</th>
+              <th class="border-0 pb-3">Time</th>
+              <th class="border-0 pb-3"></th>
             </tr>
           </thead>
           <tbody>
             {% for video in videos %}
             <tr>
-              <td class="border-0 py-3">
+              <td class="border-0 py-2">
                 <span class="status-badge badge-{{ video.status }}">{{ video.status }}</span>
               </td>
-              <td class="border-0 py-3 text-white">
-                {{ video.location.name|default:"—" }}
+              <td class="border-0 py-2 text-white">{{ video.location.name|default:"—" }}</td>
+              <td class="border-0 py-2">
+                {% if video.vehicle_count %}
+                  <div style="font-family:'JetBrains Mono',monospace;">{{ video.vehicle_count }}</div>
+                  {% if video.car_count or video.truck_count or video.bus_count or video.motorcycle_count %}
+                  <div class="breakdown-mini mt-1">
+                    <span>🚗{{ video.car_count }}</span>
+                    <span>🚛{{ video.truck_count }}</span>
+                    <span>🚌{{ video.bus_count }}</span>
+                    <span>🏍{{ video.motorcycle_count }}</span>
+                  </div>
+                  {% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
-              <td class="border-0 py-3" style="font-family: 'JetBrains Mono', monospace;">
-                {% if video.vehicle_count %}{{ video.vehicle_count }}{% else %}<span class="text-muted">—</span>{% endif %}
-              </td>
-              <td class="border-0 py-3" style="font-family: 'JetBrains Mono', monospace;">
+              <td class="border-0 py-2" style="font-family:'JetBrains Mono',monospace;">
                 {% if video.average_speed %}{{ video.average_speed }} km/h{% else %}<span class="text-muted">—</span>{% endif %}
               </td>
-              <td class="border-0 py-3 fw-bold">
+              <td class="border-0 py-2 fw-bold">
                 {% with lvl=video.predicted_congestion_level %}
                   {% if lvl == "FREE FLOW" %}<span class="level-free">{{ lvl }}</span>
                   {% elif lvl == "MODERATE" %}<span class="level-moderate">{{ lvl }}</span>
                   {% elif lvl == "HEAVY" %}<span class="level-heavy">{{ lvl }}</span>
                   {% elif lvl == "GRIDLOCK" %}<span class="level-gridlock">{{ lvl }}</span>
-                  {% else %}<span class="text-muted">—</span>
-                  {% endif %}
+                  {% else %}<span class="text-muted">—</span>{% endif %}
                 {% endwith %}
               </td>
-              <td class="border-0 py-3 text-muted" style="font-size: 0.75rem;">
+              <td class="border-0 py-2 text-muted" style="font-size:0.72rem;">
                 {{ video.uploaded_at|date:"M d, H:i" }}
               </td>
-              <td class="border-0 py-3">
+              <td class="border-0 py-2">
                 <a href="{% url 'vision:video_inference' video.id %}"
-                   class="btn btn-sm btn-outline-primary py-0 px-2"
-                   title="Watch live stream">
+                   class="btn btn-sm btn-outline-primary py-0 px-2">
                   <i class="bi bi-play-circle"></i>
                 </a>
               </td>
@@ -168,12 +232,14 @@
 
   <!-- Vision result feed -->
   <div class="col-12 col-xl-5">
-    <div class="card p-4 h-100" style="background: linear-gradient(145deg, rgba(15,22,40,0.9), rgba(10,14,26,0.9)); border-top: 4px solid var(--success);">
+    <div class="card p-4 h-100"
+         style="background:linear-gradient(145deg,rgba(15,22,40,0.9),rgba(10,14,26,0.9));
+                border-top:4px solid var(--success);">
 
       <div class="d-flex align-items-center gap-2 mb-4">
         <div class="pulse-dot"></div>
         <h6 class="fw-bold text-white fs-5 mb-0">Vision Result Feed</h6>
-        <span class="text-muted ms-auto" style="font-size: 0.75rem;">synced to traffic DB</span>
+        <span class="text-muted ms-auto" style="font-size:0.72rem;">synced → traffic DB</span>
       </div>
 
       {% if vision_readings %}
@@ -185,21 +251,26 @@
             <div class="feed-meta mt-1">
               {{ reading.vehicle_count }} vehicles &nbsp;·&nbsp;
               {{ reading.avg_speed }} km/h &nbsp;·&nbsp;
-              index {{ reading.congestion_index }}
+              idx {{ reading.congestion_index }}
+              {% if reading.car_count or reading.truck_count %}
+              &nbsp;·&nbsp;
+              🚗{{ reading.car_count }}
+              🚛{{ reading.truck_count }}
+              🚌{{ reading.bus_count }}
+              🏍{{ reading.motorcycle_count }}
+              {% endif %}
+              {% if reading.queue_length %}
+              &nbsp;·&nbsp; Q:{{ reading.queue_length }}m
+              {% endif %}
             </div>
           </div>
           <div class="text-end flex-shrink-0">
             {% with lvl=reading.congestion_level %}
-              {% if lvl == "free_flow" %}
-                <span class="level-free fw-bold" style="font-size:0.78rem;">FREE FLOW</span>
-              {% elif lvl == "moderate" %}
-                <span class="level-moderate fw-bold" style="font-size:0.78rem;">MODERATE</span>
-              {% elif lvl == "heavy" %}
-                <span class="level-heavy fw-bold" style="font-size:0.78rem;">HEAVY</span>
-              {% elif lvl == "gridlock" %}
-                <span class="level-gridlock fw-bold" style="font-size:0.78rem;">GRIDLOCK</span>
-              {% else %}
-                <span class="text-muted fw-bold" style="font-size:0.78rem;">{{ lvl|upper }}</span>
+              {% if lvl == "free_flow" %}<span class="level-free fw-bold" style="font-size:0.75rem;">FREE FLOW</span>
+              {% elif lvl == "moderate" %}<span class="level-moderate fw-bold" style="font-size:0.75rem;">MODERATE</span>
+              {% elif lvl == "heavy" %}<span class="level-heavy fw-bold" style="font-size:0.75rem;">HEAVY</span>
+              {% elif lvl == "gridlock" %}<span class="level-gridlock fw-bold" style="font-size:0.75rem;">GRIDLOCK</span>
+              {% else %}<span class="text-muted fw-bold" style="font-size:0.75rem;">{{ lvl|upper }}</span>
               {% endif %}
             {% endwith %}
             <div class="feed-meta mt-1">{{ reading.timestamp|date:"H:i:s" }}</div>
@@ -211,7 +282,7 @@
       <div class="text-center text-muted py-5">
         <i class="bi bi-activity fs-1 d-block mb-3"></i>
         No vision readings yet.<br>
-        <span style="font-size: 0.8rem;">Results appear here once a video is processed and a location is assigned.</span>
+        <span style="font-size:0.8rem;">Upload a video with a location assigned, or start a live camera feed.</span>
       </div>
       {% endif %}
     </div>
@@ -222,7 +293,6 @@
 
 {% block extra_js %}
 <script>
-  // Auto-refresh while any video is still processing
   if ({{ stats.processing }} > 0) {
     setTimeout(() => location.reload(), 8000);
   }

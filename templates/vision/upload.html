@@ -265,9 +265,13 @@ select.form-select option { background: #0f1628; }
 
           <!-- Submit -->
           <button type="submit" class="btn-upload" id="submitBtn">
-            <i class="bi bi-play-circle-fill"></i>
-            Process &amp; Analyse Video
+            <i class="bi bi-eye-fill"></i>
+            Analyse &amp; Watch Live
           </button>
+          <div class="text-muted text-center mt-2" style="font-size:.72rem;">
+            <i class="bi bi-arrow-right me-1"></i>
+            You'll be taken directly to the live detection stream
+          </div>
           <a href="{% url 'vision:status' %}"
              class="d-block text-center text-muted mt-3"
              style="font-size:.8rem;">
@@ -404,7 +408,7 @@ select.form-select option { background: #0f1628; }
   document.getElementById('uploadForm').addEventListener('submit', function () {
     submitBtn.innerHTML = `
       <span class="spinner-border spinner-border-sm" role="status"></span>
-      Uploading &amp; Processing…`;
+      Uploading… Opening Live Stream`;
     submitBtn.disabled = true;
   });
 })();
