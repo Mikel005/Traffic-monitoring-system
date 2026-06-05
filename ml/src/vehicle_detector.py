@@ -50,6 +50,10 @@ import numpy as np
 try:
     import torch
     HAS_CUDA = torch.cuda.is_available()
+    if not HAS_CUDA:
+        # Use all available CPU cores for inference
+        torch.set_num_threads(os.cpu_count() or 4)
+        torch.set_num_interop_threads(max(2, (os.cpu_count() or 4) // 2))
 except ImportError:
     torch    = None
     HAS_CUDA = False
@@ -70,17 +74,19 @@ LEVEL_MAP = {
     "HEAVY":     "heavy",     "GRIDLOCK": "gridlock",
 }
 
-STRIDE       = 2      # process every Nth frame
-IMGSZ        = 320    # YOLO input resolution
-CONF_THRESH  = 0.40
-MAX_DET      = 50
-STREAM_WIDTH = 640
-JPEG_QUALITY = 72
-DB_SAVE_EVERY  = 90   # frames between DB saves
-DB_SYNC_EVERY  = 150  # frames between TrafficReading creates
+STRIDE_STREAM  = 2      # inference every N frames during live stream
+STRIDE_BATCH   = 3      # inference every N frames during background processing
+IMGSZ_STREAM   = 192   # smaller = faster; tracking still accurate at 192
+IMGSZ_BATCH    = 256   # slightly larger for batch accuracy
+CONF_THRESH    = 0.40
+MAX_DET        = 50
+STREAM_WIDTH   = 640
+JPEG_QUALITY   = 65    # reduced for smaller payload + faster network
+DB_SAVE_EVERY  = 90
+DB_SYNC_EVERY  = 150
 XGB_CACHE_SEC  = 2.0
-LINE_RATIO     = 0.60  # counting line at 60 % of frame height
-CROSS_MARGIN   = 20    # px tolerance around counting line
+LINE_RATIO     = 0.60
+CROSS_MARGIN   = 20
 
 _ENCODE_PARAM = [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY]
 
@@ -88,7 +94,12 @@ COUNTS_DIR = Path("media") / "counts"
 
 
 def _model_supports_track(path: str) -> bool:
-    return str(path).lower().endswith(".pt")
+    """
+    .pt and .onnx models both support model.track() via ultralytics.
+    TorchScript (.torchscript) does NOT — it falls back to ByteTracker.
+    """
+    ext = str(path).lower()
+    return ext.endswith(".pt") or ext.endswith(".onnx")
 
 
 # ── CSV helper ────────────────────────────────────────────────────────────────
@@ -264,7 +275,7 @@ class InferenceWorker(threading.Thread):
             results = model.track(
                 frame, classes=self.det.vehicle_classes,
                 persist=True, verbose=False,
-                imgsz=IMGSZ, conf=CONF_THRESH, max_det=MAX_DET,
+                imgsz=IMGSZ_STREAM, conf=CONF_THRESH, max_det=MAX_DET,
                 half=HAS_CUDA, tracker="bytetrack.yaml",
             )
             res   = results[0]
@@ -281,7 +292,7 @@ class InferenceWorker(threading.Thread):
         else:
             results = model.predict(
                 frame, classes=self.det.vehicle_classes,
-                verbose=False, imgsz=IMGSZ, conf=CONF_THRESH,
+                verbose=False, imgsz=IMGSZ_STREAM, conf=CONF_THRESH,
                 max_det=MAX_DET, half=False,
             )
             res = results[0]
@@ -390,6 +401,11 @@ class VehicleDetector:
         if self.model and HAS_CUDA:
             self.model.to("cuda")
         self.vehicle_classes = VEHICLE_CLASSES
+        # Warm up: first inference is always slow due to JIT compilation
+        if self.model:
+            _dummy = np.zeros((IMGSZ_STREAM, IMGSZ_STREAM, 3), dtype=np.uint8)
+            self.model.predict(_dummy, verbose=False, imgsz=IMGSZ_STREAM,
+                               conf=CONF_THRESH, max_det=MAX_DET)
 
         # Bird's-Eye-View calibration
         self.BEV_SCALE        = 18
@@ -583,7 +599,6 @@ class VehicleDetector:
         total_speed  = [0.0]
         speed_count  = [0]
         last_db_save = 0
-        target_delay = 1.0 / fps
 
         worker = InferenceWorker(
             self, speed_history, counted_ids, cc, inbound, outbound,
@@ -594,7 +609,6 @@ class VehicleDetector:
         worker.start()
 
         while True:
-            t0    = time.time()
             frame = reader.read(timeout=2.0)
             if frame is None:
                 break
@@ -602,7 +616,7 @@ class VehicleDetector:
             frame_n   += 1
             disp      = cv2.resize(frame, (w, h))
 
-            if frame_n % STRIDE == 0:
+            if frame_n % STRIDE_STREAM == 0:
                 worker.submit(disp.copy(), w, h, line_y)
 
             res = worker.results
@@ -641,10 +655,8 @@ class VehicleDetector:
             if ok:
                 yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
                        + buf.tobytes() + b"\r\n")
-
-            elapsed = time.time() - t0
-            if elapsed < target_delay:
-                time.sleep(target_delay - elapsed)
+            # No artificial sleep — serve at max available rate.
+            # The browser's <img> tag and network naturally throttle display.
 
         worker.stop()
         reader.stop()
@@ -707,7 +719,7 @@ class VehicleDetector:
             if not ok:
                 break
             frame_n += 1
-            if frame_n % STRIDE != 0:
+            if frame_n % STRIDE_BATCH != 0:
                 continue
 
             small = cv2.resize(frame, (proc_w, proc_h))
@@ -716,7 +728,7 @@ class VehicleDetector:
             if self.use_native_track:
                 results = self.model.track(
                     small, classes=self.vehicle_classes, persist=True,
-                    verbose=False, imgsz=IMGSZ, conf=CONF_THRESH,
+                    verbose=False, imgsz=IMGSZ_BATCH, conf=CONF_THRESH,
                     max_det=MAX_DET, half=HAS_CUDA, tracker="bytetrack.yaml",
                 )
                 res = results[0]
@@ -733,7 +745,7 @@ class VehicleDetector:
             else:
                 results = self.model.predict(
                     small, classes=self.vehicle_classes, verbose=False,
-                    imgsz=IMGSZ, conf=CONF_THRESH, max_det=MAX_DET, half=False,
+                    imgsz=IMGSZ_BATCH, conf=CONF_THRESH, max_det=MAX_DET, half=False,
                 )
                 res  = results[0]
                 dets = []

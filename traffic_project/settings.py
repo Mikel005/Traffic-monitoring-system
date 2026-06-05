@@ -145,4 +145,8 @@ LSTM_MODEL_PATH   = BASE_DIR / env('LSTM_MODEL_PATH',   default='ml/saved_models
 XGB_MODEL_PATH    = BASE_DIR / env('XGB_MODEL_PATH',    default='ml/saved_models/xgb_classifier.pkl')
 XGB_SCALER_PATH   = BASE_DIR / env('XGB_SCALER_PATH',   default='ml/saved_models/xgb_scaler.pkl')
 LSTM_SCALER_PATH  = BASE_DIR / env('LSTM_SCALER_PATH',  default='ml/saved_models/scaler.pkl')
-YOLO_WEIGHTS_PATH = BASE_DIR / env('YOLO_WEIGHTS_PATH', default='ml/saved_models/yolov8n.pt')
+_yolo_default = env('YOLO_WEIGHTS_PATH', default='ml/saved_models/yolov8n.pt')
+_yolo_path    = BASE_DIR / _yolo_default
+# Auto-prefer the ONNX version if it exists alongside the .pt (2-4× faster on CPU)
+_onnx_candidate = _yolo_path.with_suffix('.onnx')
+YOLO_WEIGHTS_PATH = _onnx_candidate if _onnx_candidate.exists() else _yolo_path
