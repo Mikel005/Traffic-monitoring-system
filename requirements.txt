@@ -11,6 +11,8 @@ django-apscheduler==0.6.2
 Pillow==10.3.0
 opencv-python-headless==4.9.0.80
 ultralytics==8.1.0
+onnx>=1.14.0          # required for ONNX export (run: python ml/src/export_onnx.py)
+onnxruntime>=1.17.0   # faster CPU inference — auto-used when .onnx model exists
 
 # ── Data / ML (lightweight, rule-based predictor) ─────────
 numpy==1.26.4
