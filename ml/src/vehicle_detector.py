@@ -78,7 +78,32 @@ STRIDE_STREAM  = 2      # inference every N frames during live stream
 STRIDE_BATCH   = 3      # inference every N frames during background processing
 IMGSZ_STREAM   = 192   # smaller = faster; tracking still accurate at 192
 IMGSZ_BATCH    = 256   # slightly larger for batch accuracy
-CONF_THRESH    = 0.40
+
+# ── Detection quality thresholds ──────────────────────────────────────────────
+# Keep CONF_THRESH low so ByteTrack Stage 2 can still match partially occluded
+# vehicles using low-confidence detections (improves track continuity).
+CONF_THRESH       = 0.40   # minimum YOLO detection confidence (ByteTrack Stage 2)
+COUNT_CONF_THRESH = 0.60   # minimum score to actually COUNT a vehicle at the line
+NMS_IOU_THRESH    = 0.40   # NMS IoU — lower = more aggressive duplicate removal
+
+# ── Temporal smoothing ────────────────────────────────────────────────────────
+# A track must appear in at least MIN_TRACK_HITS consecutive frames before it is
+# output by ByteTracker. This eliminates single-frame false positives (noise,
+# shadows, reflections). Calibrate higher (4-5) for noisy camera feeds.
+MIN_TRACK_HITS    = 3
+
+# ── Region-of-Interest ────────────────────────────────────────────────────────
+# Exclude the top ROI_SKIP_TOP fraction of the frame from detection.
+# This covers sky and buildings that never contain vehicles and prevents
+# false positives from signage, trees, and overcast glare.
+ROI_SKIP_TOP      = 0.20   # exclude top 20 % (sky / buildings)
+
+# ── Vehicle size filter ───────────────────────────────────────────────────────
+# Reject bounding boxes that are too small (distant noise) or implausibly large
+# (YOLO sometimes produces whole-frame boxes on blurry inputs).
+MIN_BOX_AREA       = 400   # px² — 20×20 minimum (filters sub-pixel noise)
+MAX_BOX_AREA_RATIO = 0.25  # fraction of frame area (filters runaway full-frame boxes)
+
 MAX_DET        = 50
 STREAM_WIDTH   = 640
 JPEG_QUALITY   = 65    # reduced for smaller payload + faster network
@@ -100,6 +125,32 @@ def _model_supports_track(path: str) -> bool:
     """
     ext = str(path).lower()
     return ext.endswith(".pt") or ext.endswith(".onnx")
+
+
+def _apply_roi(frame: np.ndarray) -> np.ndarray:
+    """
+    Black out the top ROI_SKIP_TOP fraction of the frame before detection.
+    Sky, buildings, and signage never contain vehicles; excluding them
+    prevents false positives from glare, reflections, and overhead text.
+    Returns a copy with the excluded region set to black.
+    """
+    if ROI_SKIP_TOP <= 0:
+        return frame
+    cut = int(frame.shape[0] * ROI_SKIP_TOP)
+    out = frame.copy()
+    out[:cut] = 0
+    return out
+
+
+def _size_ok(x1: int, y1: int, x2: int, y2: int,
+             frame_w: int, frame_h: int) -> bool:
+    """
+    True if the bounding box area falls within the calibrated vehicle size range.
+    Rejects sub-pixel noise (too small) and runaway full-frame boxes (too large).
+    """
+    area       = max(0, x2 - x1) * max(0, y2 - y1)
+    frame_area = frame_w * frame_h
+    return MIN_BOX_AREA <= area <= frame_area * MAX_BOX_AREA_RATIO
 
 
 # ── CSV helper ────────────────────────────────────────────────────────────────
@@ -230,8 +281,10 @@ class InferenceWorker(threading.Thread):
 
         self._in_q   = queue.Queue(maxsize=1)
         self._stop   = threading.Event()
-        self._bt     = ByteTracker(high_thresh=0.50, low_thresh=0.10,
-                                    iou_thresh=0.30, max_age=30, min_hits=1)
+        # high_thresh = COUNT_CONF_THRESH: Stage 1 only matches confident detections
+        # min_hits    = MIN_TRACK_HITS:    suppress tracks seen < 3 consecutive frames
+        self._bt     = ByteTracker(high_thresh=COUNT_CONF_THRESH, low_thresh=0.10,
+                                    iou_thresh=0.30, max_age=30, min_hits=MIN_TRACK_HITS)
         # track_id → 'above' or 'below' (relative to counting line)
         self._prev_side: Dict[int, str] = {}
 
@@ -267,15 +320,19 @@ class InferenceWorker(threading.Thread):
                 time.sleep(0.05)
 
     def _process(self, frame: np.ndarray, w: int, h: int, line_y: int):
-        model = self.det.model
-        mid   = w / 2.0
+        model   = self.det.model
+        mid     = w / 2.0
+        # Apply ROI: black out sky/buildings before detection
+        det_frame = _apply_roi(frame)
 
         # ── Detection + tracking ───────────────────────────────────────
         if self.use_native_track:
             results = model.track(
-                frame, classes=self.det.vehicle_classes,
+                det_frame, classes=self.det.vehicle_classes,
                 persist=True, verbose=False,
-                imgsz=IMGSZ_STREAM, conf=CONF_THRESH, max_det=MAX_DET,
+                imgsz=IMGSZ_STREAM, conf=CONF_THRESH,
+                iou=NMS_IOU_THRESH,          # NMS IoU threshold (0.40)
+                max_det=MAX_DET,
                 half=HAS_CUDA, tracker="bytetrack.yaml",
             )
             res   = results[0]
@@ -288,11 +345,15 @@ class InferenceWorker(threading.Thread):
                           if res.boxes.id is not None
                           else np.arange(len(boxes)))
                 for box, tid, cid, sc in zip(boxes, tids, cids, scores):
+                    x1b,y1b,x2b,y2b = box
+                    if not _size_ok(x1b, y1b, x2b, y2b, w, h):
+                        continue
                     track_list.append((tuple(box.tolist()), int(tid), int(cid), float(sc)))
         else:
             results = model.predict(
-                frame, classes=self.det.vehicle_classes,
+                det_frame, classes=self.det.vehicle_classes,
                 verbose=False, imgsz=IMGSZ_STREAM, conf=CONF_THRESH,
+                iou=NMS_IOU_THRESH,          # NMS IoU threshold (0.40)
                 max_det=MAX_DET, half=False,
             )
             res = results[0]
@@ -302,11 +363,15 @@ class InferenceWorker(threading.Thread):
                 cids   = res.boxes.cls.cpu().numpy().astype(int)
                 scores = res.boxes.conf.cpu().numpy()
                 for box, cid, sc in zip(boxes, cids, scores):
+                    x1b,y1b,x2b,y2b = box.astype(int)
+                    if not _size_ok(x1b, y1b, x2b, y2b, w, h):
+                        continue
                     dets.append((box.astype(int), float(sc), int(cid)))
 
             bt_boxes  = np.array([d[0] for d in dets], dtype=np.float32) if dets else np.empty((0, 4))
             bt_scores = np.array([d[1] for d in dets], dtype=np.float32) if dets else np.empty((0,))
             bt_cids   = np.array([d[2] for d in dets], dtype=np.int32)   if dets else np.empty((0,), dtype=np.int32)
+            # Only confirmed tracks (hits >= MIN_TRACK_HITS) are returned
             active    = self._bt.update(bt_boxes, bt_scores, bt_cids)
             track_list = [
                 (tuple(t.tlbr.astype(int).tolist()), t.track_id, t.cls_id, t.score)
@@ -344,8 +409,9 @@ class InferenceWorker(threading.Thread):
             side      = "above" if cy_centre < line_y else "below"
             prev_side = self._prev_side.get(tid)
 
-            if prev_side and prev_side != side and tid not in self.counted_ids:
-                # Vehicle just crossed the line
+            if (prev_side and prev_side != side
+                    and tid not in self.counted_ids
+                    and score >= COUNT_CONF_THRESH):   # require high confidence to count
                 self.counted_ids.add(tid)
                 lbl = VEHICLE_CLASS_MAP.get(cid, "car")
                 self.cc[lbl] = self.cc.get(lbl, 0) + 1
@@ -710,8 +776,8 @@ class VehicleDetector:
         speed_count  = 0
         level        = "FREE FLOW"
         queue_len    = 0.0
-        bt           = ByteTracker(high_thresh=0.50, low_thresh=0.10,
-                                    iou_thresh=0.30, max_age=30, min_hits=1)
+        bt           = ByteTracker(high_thresh=COUNT_CONF_THRESH, low_thresh=0.10,
+                                    iou_thresh=0.30, max_age=30, min_hits=MIN_TRACK_HITS)
         prev_side: Dict[int, str] = {}
 
         while cap.isOpened():
@@ -722,14 +788,16 @@ class VehicleDetector:
             if frame_n % STRIDE_BATCH != 0:
                 continue
 
-            small = cv2.resize(frame, (proc_w, proc_h))
+            small     = cv2.resize(frame, (proc_w, proc_h))
+            det_small = _apply_roi(small)   # exclude sky/buildings
 
             # Detect
             if self.use_native_track:
                 results = self.model.track(
-                    small, classes=self.vehicle_classes, persist=True,
+                    det_small, classes=self.vehicle_classes, persist=True,
                     verbose=False, imgsz=IMGSZ_BATCH, conf=CONF_THRESH,
-                    max_det=MAX_DET, half=HAS_CUDA, tracker="bytetrack.yaml",
+                    iou=NMS_IOU_THRESH, max_det=MAX_DET,
+                    half=HAS_CUDA, tracker="bytetrack.yaml",
                 )
                 res = results[0]
                 tracks = []
@@ -741,11 +809,15 @@ class VehicleDetector:
                               if res.boxes.id is not None
                               else np.arange(len(boxes)))
                     for box, tid, cid, sc in zip(boxes, tids, cids, scores):
-                        tracks.append((tuple(box.tolist()), int(tid), int(cid)))
+                        x1b,y1b,x2b,y2b = box
+                        if not _size_ok(x1b, y1b, x2b, y2b, proc_w, proc_h):
+                            continue
+                        tracks.append((tuple(box.tolist()), int(tid), int(cid), float(sc)))
             else:
                 results = self.model.predict(
-                    small, classes=self.vehicle_classes, verbose=False,
-                    imgsz=IMGSZ_BATCH, conf=CONF_THRESH, max_det=MAX_DET, half=False,
+                    det_small, classes=self.vehicle_classes, verbose=False,
+                    imgsz=IMGSZ_BATCH, conf=CONF_THRESH,
+                    iou=NMS_IOU_THRESH, max_det=MAX_DET, half=False,
                 )
                 res  = results[0]
                 dets = []
@@ -754,16 +826,20 @@ class VehicleDetector:
                     cids   = res.boxes.cls.cpu().numpy().astype(int)
                     scores = res.boxes.conf.cpu().numpy()
                     for box, cid, sc in zip(boxes, cids, scores):
+                        x1b,y1b,x2b,y2b = box.astype(int)
+                        if not _size_ok(x1b, y1b, x2b, y2b, proc_w, proc_h):
+                            continue
                         dets.append((box, float(sc), int(cid)))
                 bt_boxes  = np.array([d[0] for d in dets], dtype=np.float32) if dets else np.empty((0,4))
                 bt_scores = np.array([d[1] for d in dets], dtype=np.float32) if dets else np.empty((0,))
                 bt_cids   = np.array([d[2] for d in dets], dtype=np.int32)   if dets else np.empty((0,),dtype=np.int32)
+                # Only confirmed tracks returned (hits >= MIN_TRACK_HITS)
                 active    = bt.update(bt_boxes, bt_scores, bt_cids)
-                tracks    = [(tuple(t.tlbr.astype(int).tolist()), t.track_id, t.cls_id) for t in active]
+                tracks    = [(tuple(t.tlbr.astype(int).tolist()), t.track_id, t.cls_id, t.score) for t in active]
 
             # Process tracks
             bev_pts = []
-            for (x1, y1, x2, y2), tid, cid in tracks:
+            for (x1, y1, x2, y2), tid, cid, score in tracks:
                 cx, cy = (x1+x2)//2, y2
                 M      = self.ML if cx < mid else self.MR
                 bev_pt = self._to_bev(M, cx, cy)
@@ -789,7 +865,9 @@ class VehicleDetector:
                 cy_centre = (y1 + y2) / 2.0
                 side      = "above" if cy_centre < line_y else "below"
                 p_side    = prev_side.get(tid)
-                if p_side and p_side != side and tid not in counted_ids:
+                if (p_side and p_side != side
+                        and tid not in counted_ids
+                        and score >= COUNT_CONF_THRESH):
                     counted_ids.add(tid)
                     lbl = VEHICLE_CLASS_MAP.get(cid, "car")
                     cc[lbl] = cc.get(lbl, 0) + 1
