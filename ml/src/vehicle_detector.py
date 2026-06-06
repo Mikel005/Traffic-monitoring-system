@@ -333,7 +333,7 @@ class InferenceWorker(threading.Thread):
                 dx     = hist[-1][0] - hist[0][0]
                 dy     = hist[-1][1] - hist[0][1]
                 dist_m = math.hypot(dx, dy) / self.det.BEV_SCALE
-                dt_s   = (len(hist) - 1) * STRIDE / self.fps
+                dt_s   = (len(hist) - 1) * STRIDE_STREAM / self.fps
                 kph    = (dist_m / dt_s * 3.6) if dt_s > 0 else 0.0
                 if 1.0 < kph < 200.0:
                     self.total_speed[0] += kph
@@ -779,7 +779,7 @@ class VehicleDetector:
                     dx     = hist[-1][0] - hist[0][0]
                     dy     = hist[-1][1] - hist[0][1]
                     dist_m = math.hypot(dx, dy) / self.BEV_SCALE
-                    dt_s   = (len(hist) - 1) * STRIDE / fps
+                    dt_s   = (len(hist) - 1) * STRIDE_BATCH / fps
                     kph    = (dist_m / dt_s * 3.6) if dt_s > 0 else 0.0
                     if 1.0 < kph < 200.0:
                         total_speed += kph
