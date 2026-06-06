@@ -742,7 +742,7 @@ class VehicleDetector:
                 break
 
             frame_n += 1
-            disp = cv2.resize(frame, (w, h))
+            disp = np.zeros((h, w, 3), dtype=np.uint8)   # black canvas — no raw video
 
             if frame_n % STRIDE_STREAM == 0:
                 worker.submit(disp.copy())
