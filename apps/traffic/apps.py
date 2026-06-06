@@ -17,7 +17,10 @@ class TrafficConfig(AppConfig):
                 cursor = connection.cursor()
                 cursor.execute('PRAGMA journal_mode=WAL;')
                 cursor.execute('PRAGMA synchronous=NORMAL;')
-                cursor.execute('PRAGMA busy_timeout=20000;')
+                # busy_timeout must be >= Django OPTIONS timeout (30s) so SQLite's
+                # C-level retry fires first, giving the smoothest backoff behaviour.
+                cursor.execute('PRAGMA busy_timeout=35000;')
+                cursor.execute('PRAGMA cache_size=-32000;')     # 32 MB page cache
 
         # Only start scheduler in the main process (not during migrations/tests)
         if os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('DJANGO_SETTINGS_MODULE'):

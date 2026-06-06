@@ -220,13 +220,14 @@ class AsyncDBWriter(threading.Thread):
         self._q.put(None)
 
     def run(self):
-        from django.db import close_old_connections
+        from django.db import close_old_connections, connection as db_conn
         from django.db.utils import OperationalError
         while True:
             item = self._q.get()
             if item is None:
                 break
             fn, args, kwargs = item
+            # Retry loop: exponential backoff on SQLite lock (max ~1.5 s total)
             for attempt in range(5):
                 try:
                     fn(*args, **kwargs)
@@ -238,8 +239,11 @@ class AsyncDBWriter(threading.Thread):
                         break
                 except Exception:
                     break
+            # Close AFTER the whole task (not inside the loop).
+            # Closing inside the loop forced a new connection on every retry,
+            # which multiplied connection overhead and made lock contention worse.
             try:
-                close_old_connections()
+                db_conn.close()
             except Exception:
                 pass
 
